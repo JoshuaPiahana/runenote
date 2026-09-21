@@ -10,6 +10,7 @@ requires-python = ">=3.12"
 license = { text = "MIT" }
 dependencies = [
     "jsonschema>=4.21",
+    "music21>=10",
     "pyyaml>=6",
 ]
 
@@ -27,6 +28,9 @@ runenote = "runenote.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+runenote = ["tiers.yaml"]
 
 [tool.ruff]
 line-length = 100
@@ -54,6 +58,9 @@ python_version = "3.12"
 files = ["src", "tests"]
 strict = true
 warn_unreachable = true
+# music21 ships hints for some of its API and none for the rest; calling the
+# rest is not our mistake.
+untyped_calls_exclude = ["music21"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

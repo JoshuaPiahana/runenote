@@ -23,6 +23,15 @@
         "licence": {
           "type": "string",
           "description": "Licence of the composition and source file. The core pack only accepts open ones."
+        },
+        "file": {
+          "type": "string",
+          "description": "Path, relative to the bundle, of the source file the tiers were arranged from. With melody, enough to rebuild the bundle."
+        },
+        "melody": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "1-based index of the source part a human confirmed as the melody."
         }
       }
     },

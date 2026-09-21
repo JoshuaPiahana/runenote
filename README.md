@@ -45,6 +45,23 @@ Everything runs in Docker; no local Python or Node is needed.
 ./rune guard    # the content rules CI enforces
 ```
 
+## Adding a song
+
+```
+./rune arrange path/to/song.musicxml --out content/packs/core/<id> --licence public-domain
+```
+
+Run without `--melody` and it lists the parts with a suggestion; run again
+with `--melody N` to confirm which one is the tune. That is the one human
+step. The pipeline transposes to a friendlier key if the ladder needs it,
+builds every level the melody can meet (see `pipeline/src/runenote/tiers.yaml`),
+and writes a bundle: `song.json`, one MusicXML per level, a backing MIDI of
+everything that is not the melody, and a copy of the source. Bundles are never
+edited by hand; `./rune regen content/packs/core/<id>` makes them again.
+
+The first song in `core` is Ode to Joy, transcribed as text in
+`pipeline/tests/fixtures/ode_to_joy.py`.
+
 ## Licence
 
 Code is MIT. The `core` content pack is CC BY-SA 4.0 (see

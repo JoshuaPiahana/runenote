@@ -1,0 +1,44 @@
+---
+# The difficulty ladder: what "easier" means, as data.
+#
+# The arranger builds a song at every level whose rules its melody can meet
+# without touching the melody's rhythm. A level the melody cannot meet is
+# simply absent for that song: its floor is higher. Re-tune by editing this
+# file; nothing in the code knows what a level means.
+#
+#   hands            right: the melody alone. both: with a left-hand part.
+#   span             the widest reach the right hand may need, in semitones
+#                    (7 is a fifth: a five-finger position).
+#   fold             whether notes outside that reach may be moved by an
+#                    octave to fit. Only at the bottom of the ladder, and only
+#                    for a few notes, or it becomes a different tune.
+#   max_folded       the share of melody notes folding may touch.
+#   max_accidentals  sharps or flats the key signature may carry. The song is
+#                    transposed to the nearest key within this for its lowest
+#                    level, and every level shares that key.
+#   layers           what the player plays: melody (the top line), bass (the
+#                    lowest note of the accompaniment), harmony (the rest).
+- level: 1
+  name: Five fingers
+  hands: right
+  span: 7
+  fold: true
+  max_folded: 0.1
+  max_accidentals: 0
+  layers: [melody]
+- level: 2
+  name: Hand shifts
+  hands: right
+  span: 12
+  max_accidentals: 1
+  layers: [melody]
+- level: 3
+  name: Bass line
+  hands: both
+  span: 12
+  max_accidentals: 2
+  layers: [melody, bass]
+- level: 4
+  name: As written
+  hands: both
+  layers: [melody, bass, harmony]

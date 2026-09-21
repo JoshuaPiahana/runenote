@@ -1,0 +1,58 @@
+{
+  "id": "ode-to-joy",
+  "title": "Ode to Joy",
+  "source": {
+    "kind": "musicxml",
+    "licence": "public-domain",
+    "file": "source.musicxml",
+    "melody": 1,
+    "origin": "Transcribed for Runenote from the finale theme of Beethoven's Symphony No. 9, Op. 125 (1824); the piano accompaniment is our own."
+  },
+  "key": "C major",
+  "time_signature": "4/4",
+  "tempo_bpm": 120.0,
+  "tiers": [
+    {
+      "level": 1,
+      "file": "tier-1.musicxml",
+      "hands": "right",
+      "difficulty": 38.2,
+      "range": {
+        "low": 60,
+        "high": 67
+      }
+    },
+    {
+      "level": 2,
+      "file": "tier-2.musicxml",
+      "hands": "right",
+      "difficulty": 45.8,
+      "range": {
+        "low": 55,
+        "high": 67
+      }
+    },
+    {
+      "level": 3,
+      "file": "tier-3.musicxml",
+      "hands": "both",
+      "difficulty": 64.8,
+      "range": {
+        "low": 43,
+        "high": 67
+      }
+    },
+    {
+      "level": 4,
+      "file": "tier-4.musicxml",
+      "hands": "both",
+      "difficulty": 72.8,
+      "range": {
+        "low": 43,
+        "high": 67
+      }
+    }
+  ],
+  "composer": "Ludwig van Beethoven",
+  "backing": "backing.mid"
+}

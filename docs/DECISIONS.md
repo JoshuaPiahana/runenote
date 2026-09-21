@@ -49,6 +49,47 @@ tier 1 should sit, nothing more.
 
 **Not doing.** Encoding any exam board or method book in the code.
 
+## A stray note may be folded. A tune may not.
+
+**Reason.** The bottom of the ladder is a five-finger hand position, and
+many tunes leave it for one note: Ode to Joy drops to the low dominant once
+in sixteen bars. Moving that one note up an octave keeps the song available
+at the stage where a child cannot yet shift their hand, and the rhythm and
+every other note stay where they were. But folding is also the fastest way to
+teach a different tune, so the table caps how many notes it may touch (a tenth
+of them) and allows it only at the lowest level. Past the cap, the level does
+not exist for that song.
+
+**Not doing.** Folding at any other level, or folding more than a few notes.
+A melody that needs more has a higher floor.
+
+## One key per song. Every level and the backing share it.
+
+**Reason.** There is one backing track, and a child moving up a level should
+hear and play the same song, not a transposed cousin of it. So the song is
+transposed once, to the nearest key friendly enough for the easiest level it
+reaches (Ode to Joy: D major to C major, two semitones down), and every level
+is written in that key. Ties in "nearest" go downward, which is a guess: it
+keeps a right-hand melody nearer middle C more often than not.
+
+**Not doing.** Per-level keys, or leaving the top level in the original key
+while the rest move. When the app can play a song in more than one key, that
+is a transposition feature in the app, not a second bundle.
+
+## A bundle carries its source and the choices that made it. It is never edited by hand.
+
+**Reason.** Arrangements are generated, so a bundle is a build product. If it
+were touched by hand, the next pipeline improvement would silently miss it,
+and nobody would know which bundles were still honest. So each bundle holds
+its source file and `song.json` records the one human decision (which part is
+the melody) along with the licence and origin, which is enough to make the
+bundle again. A test regenerates every core bundle and expects no change: a
+diff means the pipeline changed (regenerate and commit) or someone edited a
+bundle (do not).
+
+**Not doing.** Hand corrections to a tier file. Fix the source, or the
+pipeline, and regenerate.
+
 ## Content packs are the unit of swap. Quests may only use the `core` pack.
 
 **Reason.** This repository is public. An arrangement of a copyrighted game

@@ -23,6 +23,8 @@ if ! docker info >/dev/null 2>&1; then
 fi
 
 py() { docker compose run --rm --no-deps pipeline "$@"; }
+# Content commands take paths relative to the repository, so run from its root.
+content() { docker compose run --rm --no-deps -w /work pipeline runenote "$@" --root /work; }
 js() { docker compose run --rm --no-deps app sh -c "npm ci --no-audit --no-fund >/dev/null && $*"; }
 
 cmd="${1:-help}"
@@ -31,6 +33,8 @@ shift || true
 case "$cmd" in
   dev)   docker compose up app ;;
   guard) py runenote guard --root /work ;;
+  arrange) content arrange "$@" ;;
+  regen)   content regenerate "$@" ;;
   test)  py pytest "$@"; js "npm test" ;;
   lint)  py ruff check .; py ruff format --check .; py mypy
          js "npm run lint && npm run typecheck" ;;
@@ -43,6 +47,8 @@ usage: ./rune <command>
 
   dev     run the app on http://localhost:5173
   guard   check the repository only holds content it may hold
+  arrange arrange a source into a song bundle (paths relative to the repo)
+  regen   rebuild song bundles from their sources
   test    pipeline and app tests
   lint    ruff, mypy, biome, tsc
   fmt     apply formatters and safe lint fixes

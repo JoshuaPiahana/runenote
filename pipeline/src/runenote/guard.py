@@ -123,6 +123,8 @@ def _check_song(
     files = [tier.get("file") for tier in song.get("tiers", [])]
     if "backing" in song:
         files.append(song["backing"])
+    if "file" in song.get("source", {}):
+        files.append(song["source"]["file"])
     for rel in files:
         if isinstance(rel, str) and not (bundle / rel).is_file():
             report.problems.append(f"{label}: referenced file {rel!r} is missing")
