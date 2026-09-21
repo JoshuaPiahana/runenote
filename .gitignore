@@ -1,0 +1,44 @@
+# ---------------------------------------------------------------------------
+# MUSIC FILES — NEVER COMMIT OUTSIDE THE CORE PACK
+# Arrangements of copyrighted music are for the family, not the repository.
+# The only music allowed in is the licence-clean core pack and test fixtures;
+# CI checks the licence of every song in core.
+# ---------------------------------------------------------------------------
+*.mid
+*.midi
+*.mxl
+*.musicxml
+*.mscz
+*.mscx
+*.sf2
+*.sf3
+*.mp3
+*.ogg
+*.wav
+!content/packs/core/**
+!pipeline/tests/fixtures/**
+
+# Every pack except core is a family pack.
+content/packs/*
+!content/packs/core/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+build/
+dist/
+
+# Node
+node_modules/
+app/dist/
+
+# Editors and OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

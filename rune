@@ -1,0 +1,53 @@
+#!/usr/bin/env bash
+# ---------------------------------------------------------------------------
+# Runenote - thin wrapper so the everyday commands are short. Works from
+# Linux, WSL, or Git Bash on Windows:  ./rune test
+#
+# No `make` on purpose: it is not always installed, and a wrapper that fails
+# on a missing tool is a wrapper that gets abandoned.
+# ---------------------------------------------------------------------------
+set -euo pipefail
+cd "$(dirname "$0")"
+
+# Git Bash rewrites anything that looks like a Unix path before handing it to
+# a native Windows binary, which silently breaks container paths passed on the
+# command line. Turning the rewriting off is the documented fix and a no-op
+# elsewhere.
+case "${OSTYPE:-}" in
+  msys* | cygwin*) export MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' ;;
+esac
+
+if ! docker info >/dev/null 2>&1; then
+  echo "Docker is not running. Start Docker Desktop, or in WSL: sudo service docker start" >&2
+  exit 1
+fi
+
+py() { docker compose run --rm --no-deps pipeline "$@"; }
+js() { docker compose run --rm --no-deps app sh -c "npm ci --no-audit --no-fund >/dev/null && $*"; }
+
+cmd="${1:-help}"
+shift || true
+
+case "$cmd" in
+  dev)   docker compose up app ;;
+  guard) py runenote guard --root /work ;;
+  test)  py pytest "$@"; js "npm test" ;;
+  lint)  py ruff check .; py ruff format --check .; py mypy
+         js "npm run lint && npm run typecheck" ;;
+  fmt)   py ruff format .; py ruff check --fix .; js "npm run format" ;;
+  build) js "npm run build" ;;
+  sh)    py bash ;;
+  help | *)
+    cat <<'USAGE'
+usage: ./rune <command>
+
+  dev     run the app on http://localhost:5173
+  guard   check the repository only holds content it may hold
+  test    pipeline and app tests
+  lint    ruff, mypy, biome, tsc
+  fmt     apply formatters and safe lint fixes
+  build   production build of the app
+  sh      shell in the pipeline container
+USAGE
+    ;;
+esac

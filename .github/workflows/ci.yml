@@ -1,0 +1,83 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# Least privilege by default. Individual jobs raise this only if they need to.
+permissions:
+  contents: read
+
+# A new push supersedes the previous run for the same ref.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ---------------------------------------------------------------------
+  # Runs first and alone. If a copyrighted arrangement or a secret has been
+  # committed, nothing else matters and every other job is a waste of time.
+  # ---------------------------------------------------------------------
+  guard:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - run: pip install ./pipeline
+      - name: Content rules (licence allowlist, core-only quests)
+        run: runenote guard --root .
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  lint:
+    needs: guard
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -e "./pipeline[dev]"
+      - run: ruff check --output-format=github pipeline
+      - run: ruff format --check pipeline
+      - run: cd pipeline && mypy
+      - name: yamllint
+        run: pip install yamllint && yamllint .
+      - name: biome + tsc
+        run: |
+          docker compose run --rm --no-deps app \
+            sh -c "npm ci && npm run lint && npm run typecheck"
+
+  test:
+    needs: guard
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -e "./pipeline[dev]"
+      - run: cd pipeline && pytest
+      - name: vitest
+        run: docker compose run --rm --no-deps app sh -c "npm ci && npm test"
+
+  build:
+    needs: [lint, test]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Pipeline image builds and answers
+        run: |
+          docker compose build pipeline
+          docker compose run --rm --no-deps pipeline runenote --version
+      - name: App builds
+        run: docker compose run --rm --no-deps app sh -c "npm ci && npm run build"

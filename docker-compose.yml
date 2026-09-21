@@ -1,0 +1,27 @@
+---
+# Everything runs in containers; the host needs Docker and nothing else.
+# Paths are declared here rather than passed as `-v` on the command line so
+# Git Bash on Windows cannot rewrite them (see the note in ./rune).
+services:
+  pipeline:
+    build:
+      context: .
+      dockerfile: pipeline/Dockerfile
+    working_dir: /work/pipeline
+    volumes:
+      - ./:/work
+
+  app:
+    image: node:26-alpine
+    working_dir: /work/app
+    volumes:
+      - ./app:/work/app
+      # node_modules in a named volume: faster than the Windows bind mount,
+      # and it never leaks into the host checkout.
+      - app_node_modules:/work/app/node_modules
+    ports:
+      - "5173:5173"
+    command: sh -c "npm ci && npm run dev"
+
+volumes:
+  app_node_modules:

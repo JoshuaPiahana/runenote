@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "pack.schema.json",
+  "title": "Runenote content pack",
+  "description": "A directory of song bundles. Packs are the unit of swap: anything that validates, plays.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "name", "version", "licence", "songs"],
+  "properties": {
+    "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+    "name": { "type": "string", "minLength": 1 },
+    "version": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$" },
+    "licence": {
+      "type": "string",
+      "description": "Licence of the pack's arrangements, as an SPDX identifier where one exists."
+    },
+    "songs": {
+      "type": "array",
+      "description": "Song ids; each is a subdirectory holding a song.json.",
+      "items": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+      "uniqueItems": true
+    }
+  }
+}

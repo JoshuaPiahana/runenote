@@ -1,0 +1,23 @@
+---
+extends: default
+
+ignore: |
+  node_modules/
+  .venv/
+
+rules:
+  line-length:
+    max: 100
+    allow-non-breakable-words: true
+    allow-non-breakable-inline-mappings: true
+  comments:
+    min-spaces-from-content: 1
+  comments-indentation: disable
+  document-start: disable
+  truthy:
+    # GitHub Actions uses `on:` as a key, which yamllint otherwise reads as
+    # the boolean `true`.
+    check-keys: false
+  indentation:
+    spaces: 2
+    indent-sequences: consistent

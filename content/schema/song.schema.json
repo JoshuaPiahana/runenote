@@ -1,0 +1,77 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "song.schema.json",
+  "title": "Runenote song bundle",
+  "description": "One song, arranged into difficulty tiers, with its backing track.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "title", "source", "tempo_bpm", "time_signature", "tiers"],
+  "properties": {
+    "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+    "title": { "type": "string", "minLength": 1 },
+    "composer": { "type": "string" },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "licence"],
+      "properties": {
+        "kind": { "enum": ["midi", "musicxml"] },
+        "origin": {
+          "type": "string",
+          "description": "Where the source came from: a URL, an archive name, or 'transcribed by ...'."
+        },
+        "licence": {
+          "type": "string",
+          "description": "Licence of the composition and source file. The core pack only accepts open ones."
+        }
+      }
+    },
+    "key": {
+      "type": "string",
+      "description": "Key of the arranged tiers after transposition, e.g. 'C major', 'A minor'."
+    },
+    "time_signature": { "type": "string", "pattern": "^[0-9]+/[0-9]+$" },
+    "tempo_bpm": { "type": "number", "exclusiveMinimum": 0 },
+    "backing": {
+      "type": "string",
+      "description": "Path, relative to the bundle, of the backing MIDI: everything except the player's part."
+    },
+    "tiers": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["level", "file", "hands", "difficulty", "range"],
+        "properties": {
+          "level": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 4,
+            "description": "1 is easiest. A song whose melody exceeds a tier has no entry for it."
+          },
+          "file": {
+            "type": "string",
+            "description": "Path, relative to the bundle, of this tier's MusicXML."
+          },
+          "hands": { "enum": ["right", "left", "both"] },
+          "difficulty": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100,
+            "description": "Computed score for ordering within a tier."
+          },
+          "range": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["low", "high"],
+            "properties": {
+              "low": { "type": "integer", "minimum": 0, "maximum": 127 },
+              "high": { "type": "integer", "minimum": 0, "maximum": 127 }
+            }
+          }
+        }
+      }
+    }
+  }
+}
