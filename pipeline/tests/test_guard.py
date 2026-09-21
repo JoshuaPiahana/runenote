@@ -68,3 +68,17 @@ def test_quests_may_only_reference_songs_that_exist(repo: FakeRepo) -> None:
     repo.add_quest("forest", "core/nowhere")
     report = check(repo.root)
     assert_problem(report, "'core/nowhere', which is not in core")
+
+
+def test_core_rejects_a_bundle_whose_recorded_source_is_missing(repo: FakeRepo) -> None:
+    repo.add_song(
+        "forgetful",
+        source={
+            "kind": "musicxml",
+            "licence": "public-domain",
+            "file": "source.musicxml",
+            "melody": 1,
+        },
+    )
+    report = check(repo.root)
+    assert_problem(report, "forgetful: referenced file 'source.musicxml' is missing")
