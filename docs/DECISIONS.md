@@ -239,6 +239,44 @@ who has stopped to think.
 requiring the full opening chord, which punishes the beginner the gate exists
 to help.
 
+## The playhead is the clock. The band is scheduled from it, never started and left to run.
+
+Every frame, the app works out which of the band's notes fall in the next
+tenth of a second of *playhead* time and hands those to the audio clock with
+exact times. Nothing is ever simply started and left playing.
+
+**Reason.** The playhead is not wall-clock time. It stops when the player
+pauses, jumps back when a run restarts, and in wait mode — the default
+play-along — it stops dead until the player finds the next note. A backing
+running on its own clock would come apart the first time a seven year old
+hesitated, and the first thing they would learn is that the app's timing is
+not to be trusted.
+
+Scheduling from the playhead also puts the two clocks where each is good.
+Frames are jittery and timers are coarse, so neither can place a note on a
+beat; but neither has to, because they only decide *what*. The audio clock,
+which is accurate to the sample, decides *when*. The look-ahead is short on
+purpose: everything handed over is going to be heard, so a generous one would
+keep the band playing for a moment after the player stopped, which in wait
+mode is precisely the wrong moment.
+
+The instruments are synthesised rather than sampled. A sampled band would
+sound better and would be tens of megabytes of someone else's recordings,
+which is the licence question this repository exists to avoid. When a sampled
+kit earns its place it belongs in a content pack, as an asset with a licence,
+not in the code. The voices decay rather than sustain, which is also a
+learning choice: a pad held under a beginner covers their timing, and a
+plucked note does not.
+
+The app does not sound the player's own notes unless asked. A MIDI piano
+already makes its own sound, and hearing every note twice a few milliseconds
+apart is worse than the app being quiet; a keyboard with no speakers is the
+case the setting exists for.
+
+**Not doing.** An audio element, or a MIDI player running at its own tempo.
+Reading the tempo out of `backing.mid`: the bundle states one tempo and the
+playhead counts quarter notes, and two clocks drift. A sustained pad. A
+metronome, which is a separate decision and has to earn its own place.
 ## The interface is built for a controller first.
 
 **Reason.** The player's hands are on a piano, not a mouse, and the screen is
