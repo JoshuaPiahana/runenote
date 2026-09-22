@@ -58,12 +58,17 @@ class FakeRepo:
             "source": {"kind": "midi", "origin": "test fixture", "licence": licence},
             "time_signature": "4/4",
             "tempo_bpm": 100,
-            "backing": "backing.mid",
+            "backing": {
+                "file": "backing.mid",
+                "style": "steady",
+                "tracks": [{"role": "bass", "channel": 0}],
+            },
             "tiers": [
                 {
                     "level": 1,
                     "file": "tier-1.musicxml",
                     "hands": "right",
+                    "layers": ["melody"],
                     "difficulty": 10,
                     "range": {"low": 60, "high": 67},
                 }

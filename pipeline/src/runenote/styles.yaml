@@ -1,0 +1,89 @@
+---
+# The band: what plays behind the player, as data.
+#
+# A backing is not the parts the arranger had left over. It is an
+# accompaniment built to play along with: a bass, something comping the
+# chords, and a kit. The harmony comes from the song; the groove comes from
+# here. Re-tune by editing this file; nothing in the code knows what a style
+# sounds like.
+#
+# A style is chosen by the song's time signature, which it lists rather than
+# works out from the bar's length: 6/8 and 3/4 both fill three quarter notes
+# and could not feel less alike. A song in a signature no style names gets no
+# band rather than the wrong one.
+#
+#   time       the time signatures this style fits. All must fill the same
+#              bar, and no two styles may claim the same signature.
+#   bar        length of one bar in quarter notes (4/4 and 2/2 are both 4).
+#              Everything below counts in quarter notes, whatever the beat is.
+#   role       bass, keys or drums. The app mutes whichever roles the
+#              player's own level asks their hands to play, so the band is
+#              always the part that is missing.
+#   program    General MIDI program, numbered from 0 as MIDI numbers it, so
+#              33 is Electric Bass (finger) and not Acoustic Bass. The app
+#              synthesises its own voices and only reads the role; the
+#              program is what makes backing.mid play correctly in anything
+#              else, which is also how it gets checked.
+#   voicing    root: the chord's root alone. chord: the whole chord, stacked
+#              upward from its root.
+#   range      where the root sits, as MIDI numbers: a bass register and a
+#              comping register below the melody. The chord is stacked
+#              above it, so a chord layer sounds up to an octave higher.
+#   pattern    beats from the start of the bar. A short first bar (a pickup)
+#              takes the end of the pattern, so the groove lands on the beat
+#              the bar actually is.
+#   hits       drums only: the General MIDI percussion note each beat strikes.
+#   length     how long each note is held. A note is cut short when the chord
+#              under it changes, so the table never has to know the song's
+#              harmonic rhythm.
+- id: steady
+  name: Steady four
+  time: ["4/4", "2/2"]
+  bar: 4
+  layers:
+    - role: bass
+      program: 33      # Electric Bass (finger)
+      voicing: root
+      range: [36, 47]
+      pattern: [0, 2]
+      length: 1.75
+      velocity: 76
+    - role: keys
+      program: 24      # Acoustic Guitar (nylon): separates from the piano
+      voicing: chord   # the player is already playing
+      range: [48, 59]
+      pattern: [1, 3]
+      length: 0.9
+      velocity: 54
+    - role: drums
+      length: 0.25
+      velocity: 66
+      hits:
+        36: [0, 2]                            # bass drum
+        38: [1, 3]                            # snare
+        42: [0, 0.5, 1, 1.5, 2, 2.5, 3, 3.5]  # closed hi-hat
+- id: waltz
+  name: Waltz three
+  time: ["3/4"]
+  bar: 3
+  layers:
+    - role: bass
+      program: 33
+      voicing: root
+      range: [36, 47]
+      pattern: [0]
+      length: 0.9
+      velocity: 76
+    - role: keys
+      program: 24
+      voicing: chord
+      range: [48, 59]
+      pattern: [1, 2]
+      length: 0.9
+      velocity: 54
+    - role: drums
+      length: 0.25
+      velocity: 66
+      hits:
+        36: [0]
+        42: [1, 2]

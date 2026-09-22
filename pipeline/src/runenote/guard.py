@@ -121,8 +121,11 @@ def _check_song(
         )
 
     files = [tier.get("file") for tier in song.get("tiers", [])]
-    if "backing" in song:
-        files.append(song["backing"])
+    # A malformed backing has already been reported against the schema above;
+    # here we only want the file it names, if it named one we can read.
+    backing = song.get("backing")
+    if isinstance(backing, dict):
+        files.append(backing.get("file"))
     if "file" in song.get("source", {}):
         files.append(song["source"]["file"])
     for rel in files:

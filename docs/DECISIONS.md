@@ -76,6 +76,42 @@ keeps a right-hand melody nearer middle C more often than not.
 while the rest move. When the app can play a song in more than one key, that
 is a transposition feature in the app, not a second bundle.
 
+## The backing is a band, and it plays the parts you are not playing.
+
+The backing is not the parts the arranger had left over. It is generated: the
+accompaniment is read for its *harmony*, and a bass, something comping the
+chords and a drum kit are built from it, following a groove taken from a style
+table (`pipeline/src/runenote/styles.yaml`) chosen by the song's time
+signature. The app mutes whichever of those roles the player's own level asks
+their hands to play.
+
+**Reason.** Playing along with a band is what turns a line of notes into
+music, and it teaches something a metronome cannot: pulse you have to stay
+with. You can drift away from a click and not notice. You cannot drift away
+from a bass and a drummer.
+
+Shipping the leftover parts instead would be less work and would actively do
+harm. On piano sheet music the leftovers are the left hand — exactly what the
+player takes over at level 3 — so the app would be playing the player's own
+part back at them, correctly, over the top of their mistakes. That is the same
+dishonest feedback the microphone decision exists to avoid, arriving by a
+different door.
+
+Muting by role is the other half of it, and it makes the ladder mean something
+on the way up: at the lower levels the band plays bass, keys and kit behind
+your right hand. At level 3 your left hand takes the bass, so the bassist
+stops. At level 4 you have the chords too, and it is just you and a drummer.
+The band hands you its job one piece at a time, and the thinning is the point
+rather than a fault.
+
+**Not doing.** Shipping the source's leftover parts as the backing. One
+backing file per tier: there is one file, and the app mutes what the level
+covers. Inventing harmony where the song rests — the band's harmonic layers
+rest with the accompaniment, though the kit keeps the pulse. Putting a style
+under a time signature it does not name: 6/8 and 3/4 fill the same three
+quarter notes and could not feel less alike, so a song in a signature no style
+claims gets no band rather than the wrong one.
+
 ## A bundle carries its source and the choices that made it. It is never edited by hand.
 
 **Reason.** Arrangements are generated, so a bundle is a build product. If it

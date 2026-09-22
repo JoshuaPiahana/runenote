@@ -30,7 +30,7 @@ runenote = "runenote.cli:main"
 where = ["src"]
 
 [tool.setuptools.package-data]
-runenote = ["tiers.yaml"]
+runenote = ["tiers.yaml", "styles.yaml"]
 
 [tool.ruff]
 line-length = 100
