@@ -1,9 +1,16 @@
-// The smallest thing that proves the premise: the browser can see the
-// keyboard. Everything else builds on this working.
+// Wiring: pack on the left, keyboard on the right, notation in the middle.
+// Pick a song and a level and the tier's MusicXML is drawn. Nothing listens
+// to the notes yet beyond showing the last one; that is the next slice.
 
+import "./style.css";
+import { type LoadedPack, loadPack, loadTier, type Song, type Tier } from "./bundle";
+import { connectMidi } from "./midi";
 import { midiToName } from "./notes";
+import { Score } from "./score";
 
-const NOTE_ON = 0x90;
+// The only pack the app knows about for now. Family packs are imported at
+// runtime later; the core pack is what ships.
+const PACK_BASE = "/packs/core";
 
 function must(selector: string): HTMLElement {
   const element = document.querySelector<HTMLElement>(selector);
@@ -14,54 +21,106 @@ function must(selector: string): HTMLElement {
 }
 
 must("#app").innerHTML = `
-  <h1>Runenote</h1>
-  <p id="status">Looking for MIDI keyboards…</p>
-  <ul id="devices"></ul>
-  <p id="last"></p>
+  <header>
+    <h1>Runenote</h1>
+    <p class="muted"><span id="keyboard">Looking for MIDI keyboards…</span> <span id="last"></span></p>
+  </header>
+  <section class="controls">
+    <label>Song <select id="song"></select></label>
+    <fieldset id="levels"><legend>Level</legend></fieldset>
+  </section>
+  <p id="about" class="muted"></p>
+  <p id="error" role="alert" hidden></p>
+  <div id="score"></div>
 `;
-const status = must("#status");
-const devices = must("#devices");
-const last = must("#last");
 
-function render(access: MIDIAccess): void {
-  const inputs = [...access.inputs.values()];
-  status.textContent =
-    inputs.length === 0
-      ? "No MIDI keyboard found. Plug one in; it will appear here."
-      : `${inputs.length} MIDI input${inputs.length === 1 ? "" : "s"} connected.`;
-  devices.replaceChildren(
-    ...inputs.map((input) => {
-      const item = document.createElement("li");
-      item.textContent = `${input.manufacturer ?? ""} ${input.name ?? "unnamed"}`.trim();
-      return item;
+const keyboardLine = must("#keyboard");
+const lastNote = must("#last");
+const songSelect = must("#song") as HTMLSelectElement;
+const levels = must("#levels");
+const about = must("#about");
+const errorLine = must("#error");
+const score = new Score(must("#score"));
+
+function showError(error: unknown): void {
+  errorLine.textContent = error instanceof Error ? error.message : String(error);
+  errorLine.hidden = false;
+}
+
+function describeTier(tier: Tier): string {
+  const hands = tier.hands === "both" ? "both hands" : `${tier.hands} hand`;
+  return `${tier.level} · ${hands} · ${midiToName(tier.range.low)}–${midiToName(tier.range.high)}`;
+}
+
+function describeSong(song: Song): string {
+  return [song.composer, song.key, song.time_signature, `♩ = ${song.tempo_bpm}`]
+    .filter(Boolean)
+    .join(" · ");
+}
+
+async function showTier(song: Song, tier: Tier): Promise<void> {
+  errorLine.hidden = true;
+  try {
+    await score.show(await loadTier(PACK_BASE, song, tier));
+  } catch (error) {
+    showError(error);
+  }
+}
+
+function showSong(song: Song): void {
+  about.textContent = describeSong(song);
+  levels.replaceChildren(
+    Object.assign(document.createElement("legend"), { textContent: "Level" }),
+    ...song.tiers.map((tier, index) => {
+      const label = document.createElement("label");
+      const input = document.createElement("input");
+      input.type = "radio";
+      input.name = "level";
+      input.value = String(tier.level);
+      input.checked = index === 0;
+      input.onchange = () => void showTier(song, tier);
+      label.append(input, ` ${describeTier(tier)}`);
+      return label;
     }),
   );
-  for (const input of inputs) {
-    input.onmidimessage = (event: MIDIMessageEvent) => {
-      const data = event.data;
-      if (!data || data.length < 3) {
-        return;
-      }
-      const [command = 0, note = 0, velocity = 0] = data;
-      if ((command & 0xf0) === NOTE_ON && velocity > 0) {
-        last.textContent = `Last note: ${midiToName(note)} (velocity ${velocity})`;
-      }
-    };
+  // A song always opens at its easiest level: that is the one a player is
+  // most likely to be able to read, and moving up is one click.
+  const first = song.tiers[0];
+  if (first) {
+    void showTier(song, first);
   }
 }
 
-async function connect(): Promise<void> {
-  if (!("requestMIDIAccess" in navigator)) {
-    status.textContent = "This browser has no Web MIDI. Use Chrome, Edge or Firefox.";
-    return;
-  }
-  try {
-    const access = await navigator.requestMIDIAccess();
-    render(access);
-    access.onstatechange = () => render(access);
-  } catch (error) {
-    status.textContent = `MIDI access refused: ${String(error)}`;
+function showPack({ pack, songs }: LoadedPack): void {
+  songSelect.replaceChildren(
+    ...songs.map((song) => new Option(song.title, song.id)),
+    ...(songs.length === 0 ? [new Option(`${pack.name} has no songs`, "")] : []),
+  );
+  songSelect.onchange = () => {
+    const song = songs.find((s) => s.id === songSelect.value);
+    if (song) {
+      showSong(song);
+    }
+  };
+  const first = songs[0];
+  if (first) {
+    showSong(first);
   }
 }
 
-void connect();
+void loadPack(PACK_BASE).then(showPack, showError);
+
+void connectMidi({
+  onInputs(names) {
+    keyboardLine.textContent =
+      names.length === 0
+        ? "No MIDI keyboard found. Plug one in; it will appear here."
+        : `Keyboard: ${names.join(", ")}`;
+  },
+  onNoteOn(note, velocity) {
+    lastNote.textContent = `Last note: ${midiToName(note)} (velocity ${velocity})`;
+  },
+  onUnavailable(reason) {
+    keyboardLine.textContent = reason;
+  },
+});
