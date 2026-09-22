@@ -206,40 +206,62 @@ h1 {
   min-height: 0;
 }
 
-#highway {
+/* The scrolling view is a window onto one very long line of music, so the
+   panel clips and the staff inside it is what moves. */
+.sheet {
+  position: relative;
   flex: 1;
-  width: 100%;
-  min-height: 240px;
-  display: block;
+  min-height: 220px;
   border-radius: var(--radius);
   border: 1px solid var(--line);
-  background: linear-gradient(180deg, #0d1018 0%, #131829 100%);
+  background: #0f1320;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
 }
 
-/* OSMD draws black on transparent, so notation keeps a paper-coloured panel
-   of its own rather than being recoloured: a stave is a stave. */
-.sheet {
+#staff {
+  /* OSMD lays the sheet out to fit its container, and a flex item with no
+     content is zero wide, which draws nothing at all. */
+  width: 100%;
+  will-change: transform;
+}
+
+/* Where the music is now. Everything to the left has been played. */
+#playline {
+  position: absolute;
+  top: 8%;
+  bottom: 8%;
+  left: 30%;
+  width: 2px;
+  border-radius: 2px;
+  background: var(--focus);
+  box-shadow: 0 0 18px 2px rgb(255 194 71 / 45%);
+  pointer-events: none;
+}
+
+#playline[hidden] {
+  display: none;
+}
+
+/* The traditional view is a page: paper, wrapped systems, reader scrolls. */
+#play[data-view="traditional"] .sheet {
   background: #f4f1ea;
-  border-radius: var(--radius);
-  padding: 8px;
+  align-items: flex-start;
   overflow: auto;
-  min-height: 0;
+  padding: 8px;
 }
 
-#play[data-view="highway"] .sheet {
+.gate {
+  margin: 10px 0 0;
+  text-align: center;
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--focus);
+}
+
+.gate[hidden] {
   display: none;
-}
-
-#play[data-view="notation"] #highway {
-  display: none;
-}
-
-#play[data-view="both"] .sheet {
-  flex: 0 0 40%;
-}
-
-#play[data-view="notation"] .sheet {
-  flex: 1;
 }
 
 .hint {

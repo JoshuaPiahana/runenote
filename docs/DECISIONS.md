@@ -158,31 +158,50 @@ player's recent errors, are the explicit explanation Duolingo omits.
 to behaviours that produce learning: slow accurate runs, attempting the next
 tier, reading something new.
 
-## The note highway is the default display. Notation is a rung above it, not a mode.
+## The player reads notation, and the notation moves.
 
-**Reason.** Reading a page of engraved notation is tiring for a beginner, and
-tiring means less practice, which costs more learning than any single feature
-buys. A highway — notes falling onto a picture of the keyboard — removes that
-cost: the horizontal axis *is* the keyboard, so "which note" and "which key"
-stop being two separate problems, and a five-finger level literally draws five
-keys.
+**Reason.** What made the first screen tiring was never the stave, it was the
+page: a wall of small black marks on white, sixteen bars at once, with nothing
+saying where you are. So the fix is not to stop using notation, it is to stop
+using the page. One line of music scrolls horizontally past a fixed play line,
+dark, with the notes in the colour of the hand that plays them. There is one
+thing to look at and it is always in the same place.
 
-But a highway is also the most reliable way ever invented to produce a player
-who cannot read music, which is the opposite of maximising learning. The eldest
-is learning to read weekly from a method book with a tutor, and an app that
-drills the highway every day competes with that.
+This matters more than it looks. A falling-note highway was tried here first
+and dropped, and it is worth writing down why: a highway is the most reliable
+way ever invented to produce a player who cannot read music. The eldest is
+learning to read weekly from a method book with a tutor, and an app drilled
+daily that bypasses reading competes with that for no gain the app needs. The
+scrolling stave keeps every hour of practice pointed at the skill the tutor is
+teaching, which is what maximising learning means here.
 
-So reading is not a toggle hidden in settings, it is a rung: **highway → both →
-notation**, the same shape as the difficulty ladder. The middle rung, notation
-above the highway with the same music at the same moment, is the one that does
-the teaching — it is the only place a player sees that the dot on the stave and
-the falling block are the same fact. Later this becomes a per-song setting that
-starts low and is expected to climb, and reading becomes something the app
-levels you into.
+The **traditional** view — the printed page, wrapped systems, black on cream —
+stays one press away, because that is what the music looks like everywhere
+except in this app, and a player should never be surprised by it.
 
-**Not doing.** A highway-only app. Also not doing scrolling notation as the
-primary view, which is what a paper-first app would pick and what made this
-one tiring to look at.
+**Not doing.** A falling-note highway, a piano-roll, or any display that shows
+which key to press without showing what is written. Also not colouring notes by
+pitch: colour here means "this is your hand", which is structural and never has
+to be unlearned, rather than a code for note names that eventually must be.
+
+## A song starts when the player plays its first note.
+
+**Reason.** Borrowed from Duolingo Music, and kept because it earns its place:
+nothing moves until the opening note is played, so a run never begins with the
+player already behind. It puts the first act of every session in the player's
+hands rather than a countdown's, and it means the very first thing that happens
+is a note read off the stave and found on the keyboard — the whole skill, in
+miniature, before the song has started.
+
+Any note of the opening counts, so a two-hand piece does not demand a four-note
+chord be struck together to begin; the prompt names one note, the top of the
+melody, because naming four reads as an instruction to play a chord. The gate
+is re-armed after every run, so looping the song never scrolls past a player
+who has stopped to think.
+
+**Not doing.** A countdown, a metronome lead-in, or an automatic start. Also not
+requiring the full opening chord, which punishes the beginner the gate exists
+to help.
 
 ## The interface is built for a controller first.
 
@@ -197,10 +216,10 @@ in the practice flow, or a layout that assumes a pointer.
 
 ## Dark by default, and no theme switch.
 
-**Reason.** The room is dim, the screen is close, and the highway's colours
-only read against something near black. One theme is one thing to get right.
-Hands are told apart by colour *and* by position (left hand low and on the
-left), so colour is never the only cue.
+**Reason.** The room is dim, the screen is close, and the coloured notes only
+read against something near black. One theme is one thing to get right. Hands
+are told apart by colour *and* by stave, so colour is never the only cue.
 
-**Not doing.** A light theme, until someone actually practises in a bright room
-and says so.
+**Not doing.** A light theme for the moving view, until someone actually
+practises in a bright room and says so. The traditional view is already light,
+because a printed page is.

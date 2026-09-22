@@ -4,17 +4,17 @@
 import "./style.css";
 import { loadPack, loadTier, type Song, type Tier } from "./bundle";
 import { type Command, Gamepads, keyCommand } from "./gamepad";
-import { Highway } from "./highway";
 import { standInNote } from "./keys";
 import { connectMidi } from "./midi";
-import { type Piece, parseMusicXml } from "./music";
+import { firstOnset, openingCue, type Piece, parseMusicXml, type TimedNote } from "./music";
 import { midiToName } from "./notes";
-import { Score } from "./score";
+import { Score, type ScoreView } from "./score";
 
 const PACK_BASE = "/packs/core";
-/** Highway, both, notation: reading is a rung on a ladder, not a switch. */
-const VIEWS = ["highway", "both", "notation"] as const;
-type View = (typeof VIEWS)[number];
+const VIEWS = ["scrolling", "traditional"] as const;
+/** Where the play line sits, as a fraction of the sheet's width. Left of
+    centre, because what is coming matters more than what has gone. */
+const PLAY_LINE = 0.3;
 
 function must<T extends HTMLElement>(selector: string): T {
   const element = document.querySelector<T>(selector);
@@ -40,11 +40,12 @@ const viewName = must("#view-name");
 const transport = must("#transport");
 const deviceLine = must("#device");
 const errorLine = must("#error");
-const canvas = must<HTMLCanvasElement>("#highway");
 const sheet = must("#sheet");
+const staff = must("#staff");
+const playline = must("#playline");
+const gate = must("#gate");
 
-const highway = new Highway(canvas);
-const score = new Score(sheet);
+const score = new Score(staff);
 const pads = new Gamepads();
 
 let screen: ScreenName = "songs";
@@ -52,11 +53,27 @@ let songs: Song[] = [];
 let song: Song | undefined;
 let tier: Tier | undefined;
 let piece: Piece | undefined;
-let view: View = "highway";
-let playing = false;
-/** Playhead, in quarter notes from the start. */
-let now = 0;
+let view: ScoreView = "scrolling";
+/** Waiting for the opening note, running, or held. */
+let state: "waiting" | "playing" | "paused" = "waiting";
+let opening: TimedNote[] = [];
+// The playhead is read from the clock, not accumulated a frame at a time: a
+// dropped frame must lose a frame of animation, never a fraction of a beat,
+// or the music quietly plays slower than the tempo it claims.
+let heldAt = 0;
+let startedAt = 0;
 const pressed = new Set<number>();
+/** Width of the sheet panel, read on layout rather than on every frame. */
+let stageWidth = 0;
+
+/** The playhead, in quarter notes from the start of the piece. */
+function playhead(): number {
+  if (state !== "playing") {
+    return heldAt;
+  }
+  const minute = 60000;
+  return heldAt + ((performance.now() - startedAt) * (song?.tempo_bpm ?? 120)) / minute;
+}
 
 // --- focus ----------------------------------------------------------------
 // One list per screen, and every direction moves by one. With a handful of
@@ -137,45 +154,97 @@ function showLevels(s: Song): void {
 
 // --- play -----------------------------------------------------------------
 
-function setView(next: View): void {
-  view = next;
-  viewName.textContent = next === "both" ? "Both" : next === "highway" ? "Highway" : "Notation";
-  screens.play.dataset.view = next;
-  // The sheet panel has just changed size, and OSMD measures its container
-  // when it draws, so the layout it has is the one for the old size.
-  if (next !== "highway") {
-    requestAnimationFrame(() => score.redraw());
-  }
+function colour(name: string, fallback: string): string {
+  const value = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  return value === "" ? fallback : value;
+}
+
+function armGate(): void {
+  // Every run begins on the player's own note, including after a loop: the
+  // music never starts without them, so there is nothing to catch up with.
+  state = "waiting";
+  heldAt = opening[0]?.start ?? 0;
+  const cue = openingCue(opening);
+  gate.textContent = cue ? `Play ${midiToName(cue.midi)} to start` : "";
+  gate.hidden = !cue || !score.isScrolling;
+  updateTransport();
 }
 
 function updateTransport(): void {
-  transport.textContent = playing ? "Pause" : "Play";
+  transport.textContent = state === "playing" ? "Pause" : "Play";
+}
+
+/** The opening note has been found, so the music moves. */
+function release(): void {
+  if (state === "waiting") {
+    startedAt = performance.now();
+    state = "playing";
+    gate.hidden = true;
+    updateTransport();
+  }
+}
+
+async function draw(): Promise<void> {
+  const t = tier;
+  const s = song;
+  if (!t || !s) {
+    return;
+  }
+  playline.hidden = !score.isScrolling;
+  try {
+    const xml = await loadTier(PACK_BASE, s, t);
+    piece = parseMusicXml(xml);
+    opening = firstOnset(piece);
+    // The traditional view is the printed copy, and print is black: colour is
+    // what the moving view adds, not something the notation carries around.
+    const ink = view === "traditional" ? "#1a1a1a" : undefined;
+    await score.show(
+      xml,
+      view,
+      ink ?? colour("--right", "#3ee08a"),
+      ink ?? colour("--left", "#6aa8ff"),
+    );
+    playline.hidden = !score.isScrolling;
+    if (!score.isScrolling) {
+      // The traditional view is a page, scrolled by the reader, not by us.
+      staff.style.transform = "";
+    }
+    stageWidth = sheet.clientWidth;
+    armGate();
+  } catch (error) {
+    fail(error);
+  }
 }
 
 async function startPlaying(s: Song, t: Tier): Promise<void> {
   errorLine.hidden = true;
   song = s;
   tier = t;
-  now = 0;
-  playing = false;
-  updateTransport();
   playTitle.textContent = s.title;
   playSub.textContent = `Level ${t.level} · ${describeTier(t)} · ♩ = ${s.tempo_bpm}`;
   show("play");
-  try {
-    const xml = await loadTier(PACK_BASE, s, t);
-    piece = parseMusicXml(xml);
-    highway.load(piece, t.range, s.tempo_bpm);
-    await score.show(xml);
-    playing = true;
-    updateTransport();
-  } catch (error) {
-    fail(error);
-  }
+  await draw();
+}
+
+function setView(next: ScoreView): void {
+  view = next;
+  viewName.textContent = next === "scrolling" ? "Scrolling" : "Traditional";
+  screens.play.dataset.view = next;
+  void draw();
 }
 
 function togglePlay(): void {
-  playing = !playing;
+  if (state === "playing") {
+    heldAt = playhead();
+    state = "paused";
+  } else if (state === "paused") {
+    startedAt = performance.now();
+    state = "playing";
+  } else {
+    // Starting from the button rather than the keyboard is allowed: the gate
+    // is there to begin on your own note, not to lock anyone out.
+    release();
+  }
   updateTransport();
 }
 
@@ -185,7 +254,8 @@ function run(command: Command): void {
   if (screen === "play") {
     switch (command) {
       case "back":
-        playing = false;
+        heldAt = playhead();
+        state = "paused";
         if (song) {
           showLevels(song);
         }
@@ -197,12 +267,12 @@ function run(command: Command): void {
       case "left":
       case "right": {
         const step = command === "right" ? 1 : VIEWS.length - 1;
-        setView(VIEWS[(VIEWS.indexOf(view) + step) % VIEWS.length] ?? "highway");
+        setView(VIEWS[(VIEWS.indexOf(view) + step) % VIEWS.length] ?? "scrolling");
         break;
       }
       case "up":
       case "down":
-        now = 0;
+        armGate();
         break;
     }
     return;
@@ -230,34 +300,34 @@ function run(command: Command): void {
 }
 
 // --- loop -----------------------------------------------------------------
-// One animation frame drives the gamepad and the highway: the Gamepad API has
+// One animation frame drives the gamepad and the scroll: the Gamepad API has
 // no events, so something has to poll, and this is the thing already running.
 
-let last = performance.now();
-
-function frame(time: number): void {
-  const elapsed = Math.min((time - last) / 1000, 0.1);
-  last = time;
+function frame(): void {
   pads.poll(run);
 
-  if (screen === "play" && piece) {
-    if (playing) {
-      now += (elapsed * (song?.tempo_bpm ?? 120)) / 60;
-      // Loops with a bar's rest, so the tune repeats while someone is still
-      // deciding whether they like the look of it.
-      if (now > piece.quarters + 4) {
-        now = 0;
-      }
+  if (screen === "play" && piece && score.isScrolling) {
+    const now = playhead();
+    if (state === "playing" && now > piece.quarters + 2) {
+      armGate();
     }
-    if (view !== "notation") {
-      highway.setPressed(pressed);
-      highway.draw(now);
-    }
+    // The sheet is moved rather than scrolled so the play line can stay put,
+    // and the width comes from a variable rather than from the element so the
+    // frame writes a style without also forcing a layout to read one back.
+    staff.style.transform = `translateX(${stageWidth * PLAY_LINE - score.positionAt(now)}px)`;
   }
   requestAnimationFrame(frame);
 }
 
 // --- input ----------------------------------------------------------------
+
+/** A note counts towards starting if it is one of the notes written there. */
+function played(note: number): void {
+  pressed.add(note);
+  if (state === "waiting" && opening.some((wanted) => wanted.midi === note)) {
+    release();
+  }
+}
 
 window.addEventListener("keydown", (event) => {
   if (event.repeat) {
@@ -272,7 +342,7 @@ window.addEventListener("keydown", (event) => {
   if (screen === "play" && tier) {
     const note = standInNote(event.key, tier.range.low);
     if (note !== undefined) {
-      pressed.add(note);
+      played(note);
     }
   }
 });
@@ -286,6 +356,17 @@ window.addEventListener("keyup", (event) => {
   }
 });
 
+// OSMD lays out for the width it had, so a resized window means drawing the
+// sheet again; the time-to-pixel map is rebuilt with it.
+let resizing: ReturnType<typeof setTimeout> | undefined;
+window.addEventListener("resize", () => {
+  if (screen !== "play") {
+    return;
+  }
+  clearTimeout(resizing);
+  resizing = setTimeout(() => void draw(), 200);
+});
+
 transport.onclick = togglePlay;
 must("#back").onclick = () => run("back");
 must("#view").onclick = () => run("right");
@@ -295,9 +376,7 @@ void connectMidi({
     deviceLine.textContent =
       names.length === 0 ? "No keyboard — type to play" : `Keyboard: ${names.join(", ")}`;
   },
-  onNoteOn(note) {
-    pressed.add(note);
-  },
+  onNoteOn: played,
   onNoteOff(note) {
     pressed.delete(note);
   },
@@ -306,7 +385,7 @@ void connectMidi({
   },
 });
 
-setView("highway");
+setView("scrolling");
 void loadPack(PACK_BASE).then(({ songs: loaded }) => {
   songs = loaded;
   showSongs();

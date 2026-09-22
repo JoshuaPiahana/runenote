@@ -29,18 +29,30 @@ export interface Piece {
 }
 
 const STEPS: Record<string, number> = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
-/** White keys below each pitch class, used for both pitch maths and key layout. */
-const WHITES_BELOW = [0, 1, 1, 2, 2, 3, 4, 4, 5, 5, 6, 6];
-const BLACK_CLASSES = new Set([1, 3, 6, 8, 10]);
 
-export function isBlackKey(midi: number): boolean {
-  return BLACK_CLASSES.has(((midi % 12) + 12) % 12);
+/**
+ * The notes that sound at the very start, which are the ones the player has
+ * to find before anything moves. A melody-only level has one; a two-hand
+ * level has the chord under it too.
+ */
+export function firstOnset(piece: Piece): TimedNote[] {
+  const first = piece.notes[0];
+  return first ? piece.notes.filter((note) => note.start === first.start) : [];
 }
 
-/** Number of white keys strictly below this note. The x-axis of a keyboard. */
-export function whitesBelow(midi: number): number {
-  const octave = Math.floor(midi / 12);
-  return octave * 7 + (WHITES_BELOW[((midi % 12) + 12) % 12] ?? 0);
+/**
+ * The one note to ask for by name. Playing any of the opening notes starts
+ * the song, but naming four at once reads as an instruction to play a chord,
+ * so the prompt asks for the tune: the top of the right hand where there is
+ * one, and otherwise the top note there is.
+ */
+export function openingCue(onset: TimedNote[]): TimedNote | undefined {
+  const highest = (notes: TimedNote[]) =>
+    notes.reduce<TimedNote | undefined>(
+      (best, note) => (best && best.midi >= note.midi ? best : note),
+      undefined,
+    );
+  return highest(onset.filter((note) => note.hand === "right")) ?? highest(onset);
 }
 
 function text(parent: Element, tag: string): string | undefined {

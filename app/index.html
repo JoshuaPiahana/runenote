@@ -23,7 +23,7 @@
         <p class="hint"><kbd>B</kbd> / <kbd>Esc</kbd> back</p>
       </section>
 
-      <section id="play" class="screen" hidden data-view="highway">
+      <section id="play" class="screen" hidden data-view="scrolling">
         <header class="bar">
           <button id="back" class="chip" type="button">Back</button>
           <div class="bar-titles">
@@ -34,8 +34,11 @@
           <button id="transport" class="chip chip-go" type="button">Play</button>
         </header>
         <div class="stage">
-          <div id="sheet" class="sheet"></div>
-          <canvas id="highway"></canvas>
+          <div id="sheet" class="sheet">
+            <div id="staff"></div>
+            <div id="playline"></div>
+          </div>
+          <p id="gate" class="gate" hidden></p>
         </div>
         <footer class="bar bar-foot">
           <span id="device" class="muted">Looking for keyboards…</span>
