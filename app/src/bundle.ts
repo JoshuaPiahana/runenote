@@ -10,8 +10,10 @@
 import Ajv2020, { type ErrorObject } from "ajv/dist/2020";
 import packSchema from "../../content/schema/pack.schema.json";
 import songSchema from "../../content/schema/song.schema.json";
+import { type BackingNote, parseMidiFile } from "./smf";
 
 export type Hands = "right" | "left" | "both";
+export type Layer = "melody" | "bass" | "harmony";
 
 export interface Tier {
   /** 1 is easiest. A song whose melody exceeds a tier has no entry for it. */
@@ -19,8 +21,29 @@ export interface Tier {
   /** MusicXML for this tier, relative to the bundle. */
   file: string;
   hands: Hands;
+  /** What the player's own hands cover; the band stands down from these. */
+  layers: Layer[];
   difficulty: number;
   range: { low: number; high: number };
+}
+
+/** What the band plays. The player always has the melody, so there is no
+    melody role: the band is only ever the part that is missing. */
+export type Role = "bass" | "keys" | "drums";
+
+export interface BackingTrack {
+  role: Role;
+  /** The MIDI channel this role was written on, so the app never has to
+      guess a role from the order the tracks happen to be in. */
+  channel: number;
+}
+
+export interface Backing {
+  /** The band's MIDI, relative to the bundle. */
+  file: string;
+  /** The style row it was generated from. */
+  style: string;
+  tracks: BackingTrack[];
 }
 
 export interface Song {
@@ -37,8 +60,8 @@ export interface Song {
   key?: string;
   time_signature: string;
   tempo_bpm: number;
-  /** Backing MIDI, relative to the bundle: everything except the player's part. */
-  backing?: string;
+  /** The band, absent when the song had no harmony or no style fits it. */
+  backing?: Backing;
   /** Sorted by level, easiest first. */
   tiers: Tier[];
 }
@@ -97,6 +120,10 @@ export function tierUrl(packBase: string, song: Song, tier: Tier): string {
   return `${packBase}/${song.id}/${tier.file}`;
 }
 
+export function backingUrl(packBase: string, song: Song, backing: Backing): string {
+  return `${packBase}/${song.id}/${backing.file}`;
+}
+
 // --- Loading --------------------------------------------------------------
 
 async function fetchText(url: string): Promise<string> {
@@ -135,4 +162,16 @@ export async function loadPack(packBase: string): Promise<LoadedPack> {
 
 export function loadTier(packBase: string, song: Song, tier: Tier): Promise<string> {
   return fetchText(tierUrl(packBase, song, tier));
+}
+
+export async function loadBacking(packBase: string, song: Song): Promise<BackingNote[]> {
+  if (!song.backing) {
+    return [];
+  }
+  const url = backingUrl(packBase, song, song.backing);
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`${url}: HTTP ${response.status}`);
+  }
+  return parseMidiFile(await response.arrayBuffer());
 }

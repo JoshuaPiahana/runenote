@@ -2,7 +2,8 @@
 // keyboard both reach everything. Nothing here needs a mouse.
 
 import "./style.css";
-import { loadPack, loadTier, type Song, type Tier } from "./bundle";
+import { Band, rolesCovered } from "./audio";
+import { loadBacking, loadPack, loadTier, type Song, type Tier } from "./bundle";
 import { type Command, Gamepads, keyCommand } from "./gamepad";
 import { standInNote } from "./keys";
 import { connectMidi } from "./midi";
@@ -12,6 +13,14 @@ import { Score, type ScoreView } from "./score";
 
 const PACK_BASE = "/packs/core";
 const VIEWS = ["scrolling", "traditional"] as const;
+/** What makes a sound. The band alone is the default because a MIDI piano
+    already sounds its own notes, and hearing each one twice a few
+    milliseconds apart is worse than the app being quiet. */
+const SOUNDS = [
+  { id: "band", label: "Band", band: true, you: false },
+  { id: "both", label: "Band + you", band: true, you: true },
+  { id: "off", label: "Off", band: false, you: false },
+] as const;
 /** Where the play line sits, as a fraction of the sheet's width. Left of
     centre, because what is coming matters more than what has gone. */
 const PLAY_LINE = 0.3;
@@ -37,6 +46,7 @@ const levelTitle = must("#level-title");
 const playTitle = must("#play-title");
 const playSub = must("#play-sub");
 const viewName = must("#view-name");
+const soundName = must("#sound-name");
 const transport = must("#transport");
 const deviceLine = must("#device");
 const errorLine = must("#error");
@@ -47,6 +57,7 @@ const gate = must("#gate");
 
 const score = new Score(staff);
 const pads = new Gamepads();
+const band = new Band();
 
 let screen: ScreenName = "songs";
 let songs: Song[] = [];
@@ -54,6 +65,7 @@ let song: Song | undefined;
 let tier: Tier | undefined;
 let piece: Piece | undefined;
 let view: ScoreView = "scrolling";
+let sound: (typeof SOUNDS)[number] = SOUNDS[0];
 /** Waiting for the opening note, running, or held. */
 let state: "waiting" | "playing" | "paused" = "waiting";
 let opening: TimedNote[] = [];
@@ -65,6 +77,8 @@ let startedAt = 0;
 const pressed = new Set<number>();
 /** Width of the sheet panel, read on layout rather than on every frame. */
 let stageWidth = 0;
+/** Which song's band is loaded, so switching levels does not fetch it again. */
+let bandFor: string | undefined;
 
 /** The playhead, in quarter notes from the start of the piece. */
 function playhead(): number {
@@ -222,8 +236,27 @@ async function startPlaying(s: Song, t: Tier): Promise<void> {
   tier = t;
   playTitle.textContent = s.title;
   playSub.textContent = `Level ${t.level} · ${describeTier(t)} · ♩ = ${s.tempo_bpm}`;
+  // The band stands down from whatever this level puts in the player's own
+  // hands, so it is never playing their part back at them.
+  band.standDown(rolesCovered(t.layers));
   show("play");
-  await draw();
+  await Promise.all([draw(), loadBand(s)]);
+}
+
+/** The band for a song, fetched once and kept until another song is chosen. */
+async function loadBand(s: Song): Promise<void> {
+  if (s.id === bandFor) {
+    return;
+  }
+  try {
+    band.load(await loadBacking(PACK_BASE, s), s.backing?.tracks ?? []);
+    bandFor = s.id;
+  } catch (error) {
+    // A song with no band is quiet, not broken: the notation still plays.
+    band.load([], []);
+    bandFor = s.id;
+    fail(error);
+  }
 }
 
 function setView(next: ScoreView): void {
@@ -231,6 +264,14 @@ function setView(next: ScoreView): void {
   viewName.textContent = next === "scrolling" ? "Scrolling" : "Traditional";
   screens.play.dataset.view = next;
   void draw();
+}
+
+function setSound(next: (typeof SOUNDS)[number]): void {
+  sound = next;
+  soundName.textContent = next.label;
+  if (!next.band) {
+    band.hold();
+  }
 }
 
 function togglePlay(): void {
@@ -271,8 +312,10 @@ function run(command: Command): void {
         break;
       }
       case "up":
-      case "down":
         armGate();
+        break;
+      case "down":
+        setSound(SOUNDS[(SOUNDS.indexOf(sound) + 1) % SOUNDS.length] ?? SOUNDS[0]);
         break;
     }
     return;
@@ -306,6 +349,15 @@ function run(command: Command): void {
 function frame(): void {
   pads.poll(run);
 
+  // The band is driven from the playhead rather than started and left to run,
+  // because the playhead stops: see audio.ts. Both views get it — the view is
+  // how the music is drawn, not whether it is playing.
+  if (screen === "play" && song && state === "playing" && sound.band) {
+    band.follow(playhead(), song.tempo_bpm);
+  } else {
+    band.hold();
+  }
+
   if (screen === "play" && piece && score.isScrolling) {
     const now = playhead();
     if (state === "playing" && now > piece.quarters + 2) {
@@ -322,8 +374,11 @@ function frame(): void {
 // --- input ----------------------------------------------------------------
 
 /** A note counts towards starting if it is one of the notes written there. */
-function played(note: number): void {
+function played(note: number, velocity = 90): void {
   pressed.add(note);
+  if (sound.you) {
+    band.pluck(note, velocity);
+  }
   if (state === "waiting" && opening.some((wanted) => wanted.midi === note)) {
     release();
   }
@@ -367,9 +422,20 @@ window.addEventListener("resize", () => {
   resizing = setTimeout(() => void draw(), 200);
 });
 
+// Browsers only start an audio clock from a real user gesture, and neither a
+// MIDI note nor a gamepad button is one as far as the page is concerned. A
+// key or a pointer is, and one of those always opens the page, so by the time
+// the band is wanted the clock is awake; resuming one already running costs
+// nothing. A session driven from the pad alone, from the first frame, would
+// stay silent, and there is nothing the page can do about that from here.
+for (const gesture of ["pointerdown", "keydown"] as const) {
+  window.addEventListener(gesture, () => band.wake());
+}
+
 transport.onclick = togglePlay;
 must("#back").onclick = () => run("back");
 must("#view").onclick = () => run("right");
+must("#sound").onclick = () => run("down");
 
 void connectMidi({
   onInputs(names) {
@@ -386,6 +452,7 @@ void connectMidi({
 });
 
 setView("scrolling");
+setSound(SOUNDS[0]);
 void loadPack(PACK_BASE).then(({ songs: loaded }) => {
   songs = loaded;
   showSongs();

@@ -27,7 +27,7 @@ describe("the core pack", () => {
     expect(song.id).toBe(id);
     const files = [
       ...song.tiers.map((t) => t.file),
-      ...(song.backing ? [song.backing] : []),
+      ...(song.backing ? [song.backing.file] : []),
       ...(song.source.file ? [song.source.file] : []),
     ];
     for (const file of files) {
@@ -48,6 +48,7 @@ describe("parseSong", () => {
         level: 3,
         file: "tier-3.musicxml",
         hands: "both",
+        layers: ["melody", "bass", "harmony"],
         difficulty: 50,
         range: { low: 40, high: 70 },
       },
@@ -55,6 +56,7 @@ describe("parseSong", () => {
         level: 1,
         file: "tier-1.musicxml",
         hands: "right",
+        layers: ["melody"],
         difficulty: 20,
         range: { low: 60, high: 67 },
       },
@@ -91,6 +93,7 @@ describe("urls", () => {
           level: 2,
           file: "tier-2.musicxml",
           hands: "right",
+          layers: ["melody"],
           difficulty: 1,
           range: { low: 60, high: 72 },
         },
