@@ -39,7 +39,7 @@ your own family's use, and the app itself is free and yours.
 Everything runs in Docker; no local Python or Node is needed.
 
 ```
-./rune dev      # app on http://localhost:5173: pick a song and level, read the notation
+./rune dev      # app on http://localhost:5173: pick a song and level, then play
 ./rune test     # pipeline and app tests
 ./rune lint     # ruff, mypy, biome, tsc
 ./rune guard    # the content rules CI enforces

@@ -12,6 +12,14 @@ export default defineConfig({
     strictPort: true,
     // The JSON Schemas are imported from the content tree, one level up.
     fs: { allow: [".."] },
+    watch: {
+      // The app runs in a container against a Windows bind mount, which
+      // delivers no inotify events, so without polling the dev server
+      // serves the code as it was when it started and an edit looks like
+      // it did nothing.
+      usePolling: true,
+      interval: 300,
+    },
   },
   build: {
     // OSMD and VexFlow are ~1.4 MB minified. One app, loaded once, on

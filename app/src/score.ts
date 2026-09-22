@@ -12,6 +12,7 @@ export class Score {
   // starts is dropped rather than drawn and immediately replaced.
   private queue: Promise<void> = Promise.resolve();
   private latest = 0;
+  private loaded = false;
 
   constructor(container: HTMLElement) {
     this.osmd = new OpenSheetMusicDisplay(container, {
@@ -35,10 +36,20 @@ export class Score {
         return;
       }
       await this.osmd.load(musicXml);
+      this.loaded = true;
       this.osmd.render();
     });
     // A failed load must not block the next one; the caller still sees it.
     this.queue = run.catch(() => undefined);
     return run;
+  }
+
+  /** Lays the sheet out again. Needed after the panel holding it changes size
+      or becomes visible: OSMD measures its container when it draws, so a
+      sheet drawn while the panel was hidden has no usable layout. */
+  redraw(): void {
+    if (this.loaded) {
+      this.osmd.render();
+    }
   }
 }

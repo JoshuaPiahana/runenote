@@ -157,3 +157,50 @@ player's recent errors, are the explicit explanation Duolingo omits.
 **Not doing.** Hearts, or rewarding streak length for its own sake. Rewards go
 to behaviours that produce learning: slow accurate runs, attempting the next
 tier, reading something new.
+
+## The note highway is the default display. Notation is a rung above it, not a mode.
+
+**Reason.** Reading a page of engraved notation is tiring for a beginner, and
+tiring means less practice, which costs more learning than any single feature
+buys. A highway — notes falling onto a picture of the keyboard — removes that
+cost: the horizontal axis *is* the keyboard, so "which note" and "which key"
+stop being two separate problems, and a five-finger level literally draws five
+keys.
+
+But a highway is also the most reliable way ever invented to produce a player
+who cannot read music, which is the opposite of maximising learning. The eldest
+is learning to read weekly from a method book with a tutor, and an app that
+drills the highway every day competes with that.
+
+So reading is not a toggle hidden in settings, it is a rung: **highway → both →
+notation**, the same shape as the difficulty ladder. The middle rung, notation
+above the highway with the same music at the same moment, is the one that does
+the teaching — it is the only place a player sees that the dot on the stave and
+the falling block are the same fact. Later this becomes a per-song setting that
+starts low and is expected to climb, and reading becomes something the app
+levels you into.
+
+**Not doing.** A highway-only app. Also not doing scrolling notation as the
+primary view, which is what a paper-first app would pick and what made this
+one tiring to look at.
+
+## The interface is built for a controller first.
+
+**Reason.** The player's hands are on a piano, not a mouse, and the screen is
+across the room on a music stand. A d-pad and two buttons reach everything: it
+works from the keyboard bench, it works from the sofa, and designing for six
+commands forces large targets and shallow menus, which is also what a seven
+year old needs. A mouse still works; nothing depends on it.
+
+**Not doing.** Hover-only affordances, small hit targets, typed input anywhere
+in the practice flow, or a layout that assumes a pointer.
+
+## Dark by default, and no theme switch.
+
+**Reason.** The room is dim, the screen is close, and the highway's colours
+only read against something near black. One theme is one thing to get right.
+Hands are told apart by colour *and* by position (left hand low and on the
+left), so colour is never the only cue.
+
+**Not doing.** A light theme, until someone actually practises in a bright room
+and says so.

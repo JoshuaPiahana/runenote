@@ -1,126 +1,314 @@
-// Wiring: pack on the left, keyboard on the right, notation in the middle.
-// Pick a song and a level and the tier's MusicXML is drawn. Nothing listens
-// to the notes yet beyond showing the last one; that is the next slice.
+// The shell: three screens, driven by six commands, so a controller and a
+// keyboard both reach everything. Nothing here needs a mouse.
 
 import "./style.css";
-import { type LoadedPack, loadPack, loadTier, type Song, type Tier } from "./bundle";
+import { loadPack, loadTier, type Song, type Tier } from "./bundle";
+import { type Command, Gamepads, keyCommand } from "./gamepad";
+import { Highway } from "./highway";
+import { standInNote } from "./keys";
 import { connectMidi } from "./midi";
+import { type Piece, parseMusicXml } from "./music";
 import { midiToName } from "./notes";
 import { Score } from "./score";
 
-// The only pack the app knows about for now. Family packs are imported at
-// runtime later; the core pack is what ships.
 const PACK_BASE = "/packs/core";
+/** Highway, both, notation: reading is a rung on a ladder, not a switch. */
+const VIEWS = ["highway", "both", "notation"] as const;
+type View = (typeof VIEWS)[number];
 
-function must(selector: string): HTMLElement {
-  const element = document.querySelector<HTMLElement>(selector);
+function must<T extends HTMLElement>(selector: string): T {
+  const element = document.querySelector<T>(selector);
   if (!element) {
     throw new Error(`page has no ${selector} element`);
   }
   return element;
 }
 
-must("#app").innerHTML = `
-  <header>
-    <h1>Runenote</h1>
-    <p class="muted"><span id="keyboard">Looking for MIDI keyboards…</span> <span id="last"></span></p>
-  </header>
-  <section class="controls">
-    <label>Song <select id="song"></select></label>
-    <fieldset id="levels"><legend>Level</legend></fieldset>
-  </section>
-  <p id="about" class="muted"></p>
-  <p id="error" role="alert" hidden></p>
-  <div id="score"></div>
-`;
+const screens = {
+  songs: must("#songs"),
+  levels: must("#levels"),
+  play: must("#play"),
+};
+type ScreenName = keyof typeof screens;
 
-const keyboardLine = must("#keyboard");
-const lastNote = must("#last");
-const songSelect = must("#song") as HTMLSelectElement;
-const levels = must("#levels");
-const about = must("#about");
+const songGrid = must("#song-grid");
+const levelGrid = must("#level-grid");
+const levelTitle = must("#level-title");
+const playTitle = must("#play-title");
+const playSub = must("#play-sub");
+const viewName = must("#view-name");
+const transport = must("#transport");
+const deviceLine = must("#device");
 const errorLine = must("#error");
-const score = new Score(must("#score"));
+const canvas = must<HTMLCanvasElement>("#highway");
+const sheet = must("#sheet");
 
-function showError(error: unknown): void {
+const highway = new Highway(canvas);
+const score = new Score(sheet);
+const pads = new Gamepads();
+
+let screen: ScreenName = "songs";
+let songs: Song[] = [];
+let song: Song | undefined;
+let tier: Tier | undefined;
+let piece: Piece | undefined;
+let view: View = "highway";
+let playing = false;
+/** Playhead, in quarter notes from the start. */
+let now = 0;
+const pressed = new Set<number>();
+
+// --- focus ----------------------------------------------------------------
+// One list per screen, and every direction moves by one. With a handful of
+// large cards that is predictable and can never strand the cursor.
+
+function cards(): HTMLElement[] {
+  return [...screens[screen].querySelectorAll<HTMLElement>(".card")];
+}
+
+function focusAt(index: number): void {
+  const list = cards();
+  if (list.length === 0) {
+    return;
+  }
+  list[((index % list.length) + list.length) % list.length]?.focus();
+}
+
+function moveFocus(step: number): void {
+  const list = cards();
+  const current = list.indexOf(document.activeElement as HTMLElement);
+  focusAt((current === -1 ? 0 : current) + step);
+}
+
+function show(name: ScreenName): void {
+  screen = name;
+  for (const [key, element] of Object.entries(screens)) {
+    element.hidden = key !== name;
+  }
+  focusAt(0);
+}
+
+function fail(error: unknown): void {
   errorLine.textContent = error instanceof Error ? error.message : String(error);
   errorLine.hidden = false;
 }
 
-function describeTier(tier: Tier): string {
-  const hands = tier.hands === "both" ? "both hands" : `${tier.hands} hand`;
-  return `${tier.level} · ${hands} · ${midiToName(tier.range.low)}–${midiToName(tier.range.high)}`;
+// --- cards ----------------------------------------------------------------
+
+function card(title: string, subtitle: string, onPick: () => void): HTMLElement {
+  const element = document.createElement("button");
+  element.className = "card";
+  element.type = "button";
+  const titleNode = document.createElement("span");
+  titleNode.className = "card-title";
+  titleNode.textContent = title;
+  const subNode = document.createElement("span");
+  subNode.className = "card-sub";
+  subNode.textContent = subtitle;
+  element.append(titleNode, subNode);
+  element.onclick = onPick;
+  return element;
 }
 
-function describeSong(song: Song): string {
-  return [song.composer, song.key, song.time_signature, `♩ = ${song.tempo_bpm}`]
-    .filter(Boolean)
-    .join(" · ");
+function describeTier(t: Tier): string {
+  const hands = t.hands === "both" ? "Both hands" : `${t.hands === "left" ? "Left" : "Right"} hand`;
+  return `${hands} · ${midiToName(t.range.low)}–${midiToName(t.range.high)}`;
 }
 
-async function showTier(song: Song, tier: Tier): Promise<void> {
+function showSongs(): void {
+  songGrid.replaceChildren(
+    ...songs.map((s) =>
+      card(s.title, s.composer ?? "", () => {
+        song = s;
+        showLevels(s);
+      }),
+    ),
+  );
+  show("songs");
+}
+
+function showLevels(s: Song): void {
+  levelTitle.textContent = s.title;
+  levelGrid.replaceChildren(
+    ...s.tiers.map((t) => card(`Level ${t.level}`, describeTier(t), () => void startPlaying(s, t))),
+  );
+  show("levels");
+}
+
+// --- play -----------------------------------------------------------------
+
+function setView(next: View): void {
+  view = next;
+  viewName.textContent = next === "both" ? "Both" : next === "highway" ? "Highway" : "Notation";
+  screens.play.dataset.view = next;
+  // The sheet panel has just changed size, and OSMD measures its container
+  // when it draws, so the layout it has is the one for the old size.
+  if (next !== "highway") {
+    requestAnimationFrame(() => score.redraw());
+  }
+}
+
+function updateTransport(): void {
+  transport.textContent = playing ? "Pause" : "Play";
+}
+
+async function startPlaying(s: Song, t: Tier): Promise<void> {
   errorLine.hidden = true;
+  song = s;
+  tier = t;
+  now = 0;
+  playing = false;
+  updateTransport();
+  playTitle.textContent = s.title;
+  playSub.textContent = `Level ${t.level} · ${describeTier(t)} · ♩ = ${s.tempo_bpm}`;
+  show("play");
   try {
-    await score.show(await loadTier(PACK_BASE, song, tier));
+    const xml = await loadTier(PACK_BASE, s, t);
+    piece = parseMusicXml(xml);
+    highway.load(piece, t.range, s.tempo_bpm);
+    await score.show(xml);
+    playing = true;
+    updateTransport();
   } catch (error) {
-    showError(error);
+    fail(error);
   }
 }
 
-function showSong(song: Song): void {
-  about.textContent = describeSong(song);
-  levels.replaceChildren(
-    Object.assign(document.createElement("legend"), { textContent: "Level" }),
-    ...song.tiers.map((tier, index) => {
-      const label = document.createElement("label");
-      const input = document.createElement("input");
-      input.type = "radio";
-      input.name = "level";
-      input.value = String(tier.level);
-      input.checked = index === 0;
-      input.onchange = () => void showTier(song, tier);
-      label.append(input, ` ${describeTier(tier)}`);
-      return label;
-    }),
-  );
-  // A song always opens at its easiest level: that is the one a player is
-  // most likely to be able to read, and moving up is one click.
-  const first = song.tiers[0];
-  if (first) {
-    void showTier(song, first);
-  }
+function togglePlay(): void {
+  playing = !playing;
+  updateTransport();
 }
 
-function showPack({ pack, songs }: LoadedPack): void {
-  songSelect.replaceChildren(
-    ...songs.map((song) => new Option(song.title, song.id)),
-    ...(songs.length === 0 ? [new Option(`${pack.name} has no songs`, "")] : []),
-  );
-  songSelect.onchange = () => {
-    const song = songs.find((s) => s.id === songSelect.value);
-    if (song) {
-      showSong(song);
+// --- commands -------------------------------------------------------------
+
+function run(command: Command): void {
+  if (screen === "play") {
+    switch (command) {
+      case "back":
+        playing = false;
+        if (song) {
+          showLevels(song);
+        }
+        break;
+      case "start":
+      case "confirm":
+        togglePlay();
+        break;
+      case "left":
+      case "right": {
+        const step = command === "right" ? 1 : VIEWS.length - 1;
+        setView(VIEWS[(VIEWS.indexOf(view) + step) % VIEWS.length] ?? "highway");
+        break;
+      }
+      case "up":
+      case "down":
+        now = 0;
+        break;
     }
-  };
-  const first = songs[0];
-  if (first) {
-    showSong(first);
+    return;
+  }
+  switch (command) {
+    case "up":
+    case "left":
+      moveFocus(-1);
+      break;
+    case "down":
+    case "right":
+      moveFocus(1);
+      break;
+    case "confirm":
+      (document.activeElement as HTMLElement | null)?.click();
+      break;
+    case "back":
+      if (screen === "levels") {
+        showSongs();
+      }
+      break;
+    case "start":
+      break;
   }
 }
 
-void loadPack(PACK_BASE).then(showPack, showError);
+// --- loop -----------------------------------------------------------------
+// One animation frame drives the gamepad and the highway: the Gamepad API has
+// no events, so something has to poll, and this is the thing already running.
+
+let last = performance.now();
+
+function frame(time: number): void {
+  const elapsed = Math.min((time - last) / 1000, 0.1);
+  last = time;
+  pads.poll(run);
+
+  if (screen === "play" && piece) {
+    if (playing) {
+      now += (elapsed * (song?.tempo_bpm ?? 120)) / 60;
+      // Loops with a bar's rest, so the tune repeats while someone is still
+      // deciding whether they like the look of it.
+      if (now > piece.quarters + 4) {
+        now = 0;
+      }
+    }
+    if (view !== "notation") {
+      highway.setPressed(pressed);
+      highway.draw(now);
+    }
+  }
+  requestAnimationFrame(frame);
+}
+
+// --- input ----------------------------------------------------------------
+
+window.addEventListener("keydown", (event) => {
+  if (event.repeat) {
+    return;
+  }
+  const command = keyCommand(event);
+  if (command) {
+    event.preventDefault();
+    run(command);
+    return;
+  }
+  if (screen === "play" && tier) {
+    const note = standInNote(event.key, tier.range.low);
+    if (note !== undefined) {
+      pressed.add(note);
+    }
+  }
+});
+
+window.addEventListener("keyup", (event) => {
+  if (tier) {
+    const note = standInNote(event.key, tier.range.low);
+    if (note !== undefined) {
+      pressed.delete(note);
+    }
+  }
+});
+
+transport.onclick = togglePlay;
+must("#back").onclick = () => run("back");
+must("#view").onclick = () => run("right");
 
 void connectMidi({
   onInputs(names) {
-    keyboardLine.textContent =
-      names.length === 0
-        ? "No MIDI keyboard found. Plug one in; it will appear here."
-        : `Keyboard: ${names.join(", ")}`;
+    deviceLine.textContent =
+      names.length === 0 ? "No keyboard — type to play" : `Keyboard: ${names.join(", ")}`;
   },
-  onNoteOn(note, velocity) {
-    lastNote.textContent = `Last note: ${midiToName(note)} (velocity ${velocity})`;
+  onNoteOn(note) {
+    pressed.add(note);
   },
-  onUnavailable(reason) {
-    keyboardLine.textContent = reason;
+  onNoteOff(note) {
+    pressed.delete(note);
+  },
+  onUnavailable() {
+    deviceLine.textContent = "No Web MIDI — type to play";
   },
 });
+
+setView("highway");
+void loadPack(PACK_BASE).then(({ songs: loaded }) => {
+  songs = loaded;
+  showSongs();
+}, fail);
+requestAnimationFrame(frame);
