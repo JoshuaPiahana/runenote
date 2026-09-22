@@ -3,10 +3,49 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="dark" />
     <title>Runenote</title>
   </head>
   <body>
-    <div id="app"></div>
+    <div id="app">
+      <p id="error" role="alert" hidden></p>
+
+      <section id="songs" class="screen" hidden>
+        <h1>Runenote</h1>
+        <p class="lede">Choose a song.</p>
+        <div id="song-grid" class="grid"></div>
+      </section>
+
+      <section id="levels" class="screen" hidden>
+        <h1 id="level-title">Levels</h1>
+        <p class="lede">Choose a level. Lower levels use fewer keys.</p>
+        <div id="level-grid" class="grid"></div>
+        <p class="hint"><kbd>B</kbd> / <kbd>Esc</kbd> back</p>
+      </section>
+
+      <section id="play" class="screen" hidden data-view="highway">
+        <header class="bar">
+          <button id="back" class="chip" type="button">Back</button>
+          <div class="bar-titles">
+            <strong id="play-title"></strong>
+            <span id="play-sub" class="muted"></span>
+          </div>
+          <button id="view" class="chip" type="button">View: <span id="view-name"></span></button>
+          <button id="transport" class="chip chip-go" type="button">Play</button>
+        </header>
+        <div class="stage">
+          <div id="sheet" class="sheet"></div>
+          <canvas id="highway"></canvas>
+        </div>
+        <footer class="bar bar-foot">
+          <span id="device" class="muted">Looking for keyboards…</span>
+          <span class="muted hint">
+            <kbd>A</kbd> play/pause · <kbd>←</kbd><kbd>→</kbd> view · <kbd>↑</kbd> restart ·
+            <kbd>B</kbd> back
+          </span>
+        </footer>
+      </section>
+    </div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

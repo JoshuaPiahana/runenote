@@ -1,49 +1,257 @@
-/* Enough to put the notation on a music stand. No design yet. */
+/* Dark by default, because a lit screen on a music stand in a dim room is
+   the actual setting, and because the highway's colours only read against
+   something near black. The palette is four surfaces and three accents: two
+   hands and one focus colour, so nothing on screen is decoration. */
+
 :root {
-  font-family: system-ui, sans-serif;
-  color: #222;
-  background: #fafafa;
+  --bg: #0b0d13;
+  --panel: #151926;
+  --panel-hi: #1d2232;
+  --line: #2b3142;
+  --text: #eef1f7;
+  --muted: #8f97ad;
+  --right: #46d39a;
+  --left: #7aa2ff;
+  --focus: #ffc247;
+
+  --radius: 18px;
+  color-scheme: dark;
+  font-family: ui-rounded, "Segoe UI", system-ui, sans-serif;
+  color: var(--text);
+  background: var(--bg);
 }
+
+* {
+  box-sizing: border-box;
+}
+
 body {
   margin: 0;
+  background: radial-gradient(900px 500px at 50% -10%, #1a2136 0%, transparent 70%), var(--bg);
+  min-height: 100vh;
 }
+
+/* The play screen is a fixed stage, not a document: the highway has to fit
+   the window with no scrolling, or notes leave the screen before the hit
+   line does. Menus scroll inside their own grid instead. */
 #app {
   max-width: 1100px;
+  height: 100dvh;
   margin: 0 auto;
-  padding: 0 16px 32px;
+  padding: 24px 16px 20px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
+
 h1 {
-  margin: 16px 0 4px;
+  font-size: clamp(28px, 5vw, 44px);
+  letter-spacing: -0.02em;
+  margin: 8px 0 4px;
 }
+
+.lede,
 .muted {
-  color: #666;
-  margin: 4px 0;
+  color: var(--muted);
 }
-.controls {
+
+.lede {
+  margin: 0 0 24px;
+  font-size: 17px;
+}
+
+.screen[hidden] {
+  display: none;
+}
+
+.screen {
+  flex: 1;
   display: flex;
-  flex-wrap: wrap;
-  gap: 16px 32px;
-  align-items: flex-start;
-  margin: 16px 0;
+  flex-direction: column;
+  min-height: 0;
 }
-.controls fieldset {
-  border: 0;
-  padding: 0;
-  margin: 0;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 16px;
-}
-.controls legend {
-  padding: 0;
-  margin-bottom: 4px;
-}
+
 #error {
-  color: #a00;
+  background: #3a1620;
+  border: 1px solid #7d2740;
+  color: #ffc9d4;
+  border-radius: 12px;
+  padding: 12px 16px;
 }
-/* OSMD draws black on transparent; the sheet gets its own white page. */
-#score {
-  background: #fff;
-  border: 1px solid #ddd;
+
+/* --- cards -------------------------------------------------------------
+   Chunky, high contrast, and big enough to aim at from a sofa with a
+   controller. The press depth is the whole feedback: no hover-only cues,
+   because a controller has no pointer. */
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  align-content: start;
+  gap: 16px;
+  overflow-y: auto;
+  padding: 4px;
+  margin: -4px;
+}
+
+.card {
+  appearance: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  text-align: left;
+  padding: 22px;
+  min-height: 108px;
+  border-radius: var(--radius);
+  border: 2px solid var(--line);
+  border-bottom-width: 5px;
+  background: var(--panel);
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  transition:
+    transform 0.08s ease,
+    border-color 0.12s ease,
+    background 0.12s ease;
+}
+
+.card:focus {
+  outline: none;
+  border-color: var(--focus);
+  background: var(--panel-hi);
+}
+
+.card:active {
+  transform: translateY(3px);
+  border-bottom-width: 2px;
+}
+
+.card-title {
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.card-sub {
+  color: var(--muted);
+  font-size: 15px;
+}
+
+/* --- play screen -------------------------------------------------------- */
+
+.bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-bottom: 14px;
+}
+
+.bar-titles {
+  display: flex;
+  flex-direction: column;
+  margin-right: auto;
+  min-width: 0;
+}
+
+.bar-titles strong {
+  font-size: 20px;
+}
+
+.bar-titles span {
+  font-size: 14px;
+}
+
+.bar-foot {
+  padding: 12px 0 0;
+  justify-content: space-between;
+  font-size: 13px;
+  flex-wrap: wrap;
+}
+
+.chip {
+  appearance: none;
+  border: 2px solid var(--line);
+  border-bottom-width: 4px;
+  background: var(--panel);
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+  padding: 9px 16px;
+  border-radius: 999px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.chip:focus {
+  outline: none;
+  border-color: var(--focus);
+}
+
+.chip:active {
+  transform: translateY(2px);
+  border-bottom-width: 2px;
+}
+
+.chip-go {
+  background: var(--right);
+  border-color: #2ea376;
+  color: #06231a;
+}
+
+.stage {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 0;
+}
+
+#highway {
+  flex: 1;
+  width: 100%;
+  min-height: 240px;
+  display: block;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  background: linear-gradient(180deg, #0d1018 0%, #131829 100%);
+}
+
+/* OSMD draws black on transparent, so notation keeps a paper-coloured panel
+   of its own rather than being recoloured: a stave is a stave. */
+.sheet {
+  background: #f4f1ea;
+  border-radius: var(--radius);
   padding: 8px;
+  overflow: auto;
+  min-height: 0;
+}
+
+#play[data-view="highway"] .sheet {
+  display: none;
+}
+
+#play[data-view="notation"] #highway {
+  display: none;
+}
+
+#play[data-view="both"] .sheet {
+  flex: 0 0 40%;
+}
+
+#play[data-view="notation"] .sheet {
+  flex: 1;
+}
+
+.hint {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+kbd {
+  font: inherit;
+  font-size: 0.92em;
+  background: var(--panel-hi);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 1px 6px;
 }
