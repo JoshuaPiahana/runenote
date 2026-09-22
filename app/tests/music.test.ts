@@ -1,15 +1,15 @@
 // @vitest-environment happy-dom
 
-// The highway shows what these functions return, so a mistake here is a
+// The screen shows what these functions return, so a mistake here is a
 // mistake a child copies. The rules tested are the ones that would be wrong
-// silently: chords stack, rests take time, ties join, and the keyboard's
-// x-axis is a real keyboard.
+// silently: chords stack, rests take time, ties join, the gate waits for the
+// right note, and each hand keeps its colour.
 
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-import { keyboard } from "../src/highway";
-import { isBlackKey, parseMusicXml, whitesBelow } from "../src/music";
+import { firstOnset, openingCue, parseMusicXml } from "../src/music";
+import { colourNotesByHand } from "../src/score";
 
 // Resolved from the vitest root (app/) rather than import.meta.url, which
 // under the happy-dom environment is a document URL, not a file one.
@@ -109,39 +109,94 @@ describe("the committed Ode to Joy", () => {
   });
 });
 
-describe("keyboard layout", () => {
-  it("counts the white keys below a note", () => {
-    expect(whitesBelow(60)).toBe(35); // C4: five octaves of seven
-    expect(whitesBelow(62) - whitesBelow(60)).toBe(1); // C to D
-    expect(whitesBelow(61)).toBe(whitesBelow(62)); // C# sits between them
+describe("firstOnset", () => {
+  it("returns the whole opening chord, not just its lowest note", () => {
+    const xml = score(
+      `<part id="P2"><measure number="1">${ATTRS}${note("C", 3, 4)}${note("E", 3, 4, "<chord />")}${note("F", 3, 2)}</measure></part>`,
+    );
+    expect(firstOnset(parseMusicXml(xml)).map((n) => n.midi)).toEqual([48, 52]);
   });
 
-  it("knows the black keys", () => {
-    expect([61, 63, 66, 68, 70].every(isBlackKey)).toBe(true);
-    expect([60, 62, 64, 65, 67, 69, 71].some(isBlackKey)).toBe(false);
+  it("ignores notes that merely start early in the file but late in time", () => {
+    const xml = score(
+      `<part id="P1"><measure number="1">${ATTRS}<note><rest /><duration>2</duration></note>${note("G", 4, 2)}</measure></part>` +
+        `<part id="P2"><measure number="1">${ATTRS}${note("C", 3, 2)}</measure></part>`,
+    );
+    expect(firstOnset(parseMusicXml(xml)).map((n) => n.midi)).toEqual([48]);
   });
 
-  it("fills the width with the five keys of a five-finger level", () => {
-    const keys = keyboard({ low: 60, high: 67 });
-    const whites = keys.filter((k) => !k.black);
-    expect(whites).toHaveLength(5); // C D E F G
-    expect(whites[0]?.x).toBe(0);
-    const last = whites[whites.length - 1];
-    expect((last?.x ?? 0) + (last?.width ?? 0)).toBeCloseTo(1);
+  it("is empty for a piece with no notes, so the gate cannot lock", () => {
+    expect(firstOnset({ notes: [], bars: [], quarters: 0 })).toEqual([]);
+  });
+});
+
+describe("colourNotesByHand", () => {
+  const xml = score(
+    `<part id="P1"><measure number="1">${ATTRS}${note("C", 4, 2)}<note><rest /><duration>2</duration></note></measure></part>` +
+      `<part id="P2"><measure number="1">${ATTRS}${note("C", 3, 2)}</measure></part>`,
+  );
+  const doc = new DOMParser().parseFromString(
+    colourNotesByHand(xml, "#00ff00", "#0000ff"),
+    "application/xml",
+  );
+  const coloursOf = (part: string) =>
+    [...(doc?.querySelector(`part[id=${part}]`)?.getElementsByTagName("note") ?? [])].map((n) =>
+      n.getAttribute("color"),
+    );
+
+  it("gives each hand its own colour", () => {
+    expect(coloursOf("P1")[0]).toBe("#00ff00");
+    expect(coloursOf("P2")[0]).toBe("#0000ff");
   });
 
-  it("straddles black keys across the seam between white keys", () => {
-    const keys = keyboard({ low: 60, high: 67 });
-    const cSharp = keys.find((k) => k.midi === 61);
-    const d = keys.find((k) => k.midi === 62);
-    expect(cSharp?.black).toBe(true);
-    // Centre of C# is the left edge of D, which is where a piano puts it.
-    expect((cSharp?.x ?? 0) + (cSharp?.width ?? 0) / 2).toBeCloseTo(d?.x ?? 0);
+  it("leaves rests uncoloured, because colour means 'you play this'", () => {
+    expect(coloursOf("P1")[1]).toBeNull();
   });
 
-  it("widens the range out to whole white keys when a tier ends on a black one", () => {
-    const keys = keyboard({ low: 61, high: 66 });
-    expect(keys[0]?.midi).toBe(60);
-    expect(keys[keys.length - 1]?.midi).toBe(67);
+  it("returns bad XML untouched, so OSMD reports the file and not us", () => {
+    expect(colourNotesByHand("<part", "#000000", "#ffffff")).toBe("<part");
+  });
+
+  it("keeps the XML declaration, which is how OSMD tells music from a URL", () => {
+    expect(colourNotesByHand(xml, "#00ff00", "#0000ff")).toMatch(/^<\?xml /);
+  });
+
+  // Both of these stopped the score loading at some point, so both are pinned.
+  it("drops the DOCTYPE, whose DTD reference stops OSMD reading the score", () => {
+    const withDoctype = xml.replace(
+      "<score-partwise",
+      '<!DOCTYPE score-partwise PUBLIC "-//Recordare//DTD MusicXML 4.0 Partwise//EN" "http://www.musicxml.org/dtds/partwise.dtd">\n<score-partwise',
+    );
+    expect(colourNotesByHand(withDoctype, "#00ff00", "#0000ff")).not.toMatch(/DOCTYPE/);
+  });
+
+  it("still parses back to a partwise score, which is what OSMD looks for", () => {
+    const again = new DOMParser().parseFromString(
+      colourNotesByHand(xml, "#00ff00", "#0000ff"),
+      "application/xml",
+    );
+    expect(again.documentElement.nodeName).toBe("score-partwise");
+  });
+});
+
+describe("openingCue", () => {
+  const piece = parseMusicXml(
+    score(
+      `<part id="P1"><measure number="1">${ATTRS}${note("E", 4, 2)}</measure></part>` +
+        `<part id="P2"><measure number="1">${ATTRS}${note("C", 3, 2)}${note("E", 3, 2, "<chord />")}${note("G", 3, 2, "<chord />")}</measure></part>`,
+    ),
+  );
+
+  it("asks for the tune, not the chord under it", () => {
+    expect(openingCue(firstOnset(piece))?.midi).toBe(64);
+  });
+
+  it("falls back to the top note when the opening is left hand only", () => {
+    const left = firstOnset(piece).filter((n) => n.hand === "left");
+    expect(openingCue(left)?.midi).toBe(55);
+  });
+
+  it("has nothing to ask for in an empty piece", () => {
+    expect(openingCue([])).toBeUndefined();
   });
 });
