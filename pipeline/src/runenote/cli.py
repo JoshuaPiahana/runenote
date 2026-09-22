@@ -85,6 +85,11 @@ def _arrange(args: argparse.Namespace) -> int:
         print(f"note: the source states no tempo; guessed {src.tempo_bpm:g} bpm (see --tempo)")
     moved = f"transposed {arrangement.semitones:+d}" if arrangement.semitones else "as written"
     print(f"{song['id']}: {song['key']} ({moved}), {len(song['tiers'])} tiers -> {args.out}")
+    if arrangement.backing is None:
+        print(f"  no band: nothing to take a harmony from, or no style fits {src.time_signature}")
+    else:
+        roles = ", ".join(layer.role for layer in arrangement.backing.style.layers)
+        print(f"  band: {arrangement.backing.style.name} ({roles})")
     for tier in arrangement.tiers:
         folded = f", {tier.folded} folded" if tier.folded else ""
         print(

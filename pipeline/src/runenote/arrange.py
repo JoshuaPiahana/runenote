@@ -14,6 +14,7 @@ from dataclasses import dataclass
 
 from music21 import chord, interval, key, layout, metadata, note, pitch, stream, tempo
 
+from runenote import band
 from runenote.source import Source
 from runenote.tiers import Tier
 
@@ -34,13 +35,20 @@ class ArrangedTier:
 
 
 @dataclass(frozen=True)
+class Backing:
+    style: band.Style
+    score: stream.Score
+
+
+@dataclass(frozen=True)
 class Arrangement:
     key: key.Key
     semitones: int
     """How far the song moved from its written key; 0 when it stayed."""
     tiers: list[ArrangedTier]
-    backing: stream.Score | None
-    """Everything except the melody part, or None when the source is a bare melody."""
+    backing: Backing | None
+    """The band, or None when the song has no harmony to build one from or no
+    style fits its time signature."""
 
 
 @dataclass(frozen=True)
@@ -50,7 +58,12 @@ class FoldPlan:
     folded: int
 
 
-def arrange(source: Source, melody: int, tiers: Sequence[Tier]) -> Arrangement:
+def arrange(
+    source: Source,
+    melody: int,
+    tiers: Sequence[Tier],
+    styles: Sequence[band.Style] | None = None,
+) -> Arrangement:
     melody_part = source.part(melody)
     accompaniment = [p for i, p in enumerate(source.score.parts, start=1) if i != melody]
     midis = _midis(_skyline(melody_part))
@@ -71,12 +84,15 @@ def arrange(source: Source, melody: int, tiers: Sequence[Tier]) -> Arrangement:
 
     arranged = [_build(source, tier, melody_t, accompaniment_t, target) for tier in fitting]
 
+    # The band is generated from the accompaniment's harmony rather than being
+    # the accompaniment itself: see band.py, and DECISIONS, "The backing is a
+    # band, and it plays the parts you are not playing".
     backing = None
-    if accompaniment_t:
-        backing = stream.Score()
-        for part in accompaniment_t:
-            backing.insert(0, copy.deepcopy(part))
-        _set_tempo(backing, source.tempo_bpm)
+    style = band.choose(styles if styles is not None else band.load_styles(), source.time_signature)
+    if accompaniment_t and style is not None:
+        score = band.build(melody_t, accompaniment_t, style)
+        _set_tempo(score, source.tempo_bpm)
+        backing = Backing(style=style, score=score)
 
     return Arrangement(key=target, semitones=semitones, tiers=arranged, backing=backing)
 

@@ -28,7 +28,7 @@ your own family's use, and the app itself is free and yours.
 | Directory | What it is |
 | --- | --- |
 | `pipeline/` | Python. Imports MIDI or MusicXML, builds an internal model, arranges it into difficulty tiers, emits a song bundle. |
-| `app/` | TypeScript web app. Web MIDI in, notation out, backing synthesised in the browser. |
+| `app/` | TypeScript web app. Web MIDI in, notation out, the band synthesised in the browser. |
 | `content/schema/` | The JSON Schema contract between pipeline and app. Anything that validates, plays. |
 | `content/packs/core/` | The built-in pack: public-domain compositions, our arrangements. |
 | `quests/` | Learning paths. May only reference songs in `core`. |
@@ -56,8 +56,9 @@ with `--melody N` to confirm which one is the tune. That is the one human
 step. The pipeline transposes to a friendlier key if the ladder needs it,
 builds every level the melody can meet (see `pipeline/src/runenote/tiers.yaml`),
 and writes a bundle: `song.json`, one MusicXML per level, a backing MIDI of
-everything that is not the melody, and a copy of the source. Bundles are never
-edited by hand; `./rune regen content/packs/core/<id>` makes them again.
+the band it generated from the song's harmony (see
+`pipeline/src/runenote/styles.yaml`), and a copy of the source. Bundles are
+never edited by hand; `./rune regen content/packs/core/<id>` makes them again.
 
 The first song in `core` is Ode to Joy, transcribed as text in
 `pipeline/tests/fixtures/ode_to_joy.py`.

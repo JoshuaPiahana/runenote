@@ -72,9 +72,12 @@ def test_one_key_for_every_level_chosen_for_the_easiest(ode: Source) -> None:
         for part in tier.score.parts:
             signatures = part.flatten().getElementsByClass(key.KeySignature)
             assert [k.sharps for k in signatures] == [0], f"tier {tier.tier.level}"
+    # The band moves with everything else: its first chord is C major, not D.
     assert arrangement.backing is not None
-    first = arrangement.backing.flatten().getElementsByClass(chord.Chord).first()
-    assert first is not None and first.pitchedCommonName == "C-major triad"
+    keys = arrangement.backing.score.getElementById("keys")
+    assert isinstance(keys, stream.Part)
+    opening = [n for n in keys.flatten().notes if float(n.offset) == 1.0]
+    assert sorted(p.midi for n in opening for p in n.pitches) == [48, 52, 55]
 
 
 def test_the_five_finger_level_exists_by_folding_the_one_stray_note(

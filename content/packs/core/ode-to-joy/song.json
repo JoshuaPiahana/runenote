@@ -16,6 +16,9 @@
       "level": 1,
       "file": "tier-1.musicxml",
       "hands": "right",
+      "layers": [
+        "melody"
+      ],
       "difficulty": 38.2,
       "range": {
         "low": 60,
@@ -26,6 +29,9 @@
       "level": 2,
       "file": "tier-2.musicxml",
       "hands": "right",
+      "layers": [
+        "melody"
+      ],
       "difficulty": 45.8,
       "range": {
         "low": 55,
@@ -36,6 +42,10 @@
       "level": 3,
       "file": "tier-3.musicxml",
       "hands": "both",
+      "layers": [
+        "bass",
+        "melody"
+      ],
       "difficulty": 64.8,
       "range": {
         "low": 43,
@@ -46,6 +56,11 @@
       "level": 4,
       "file": "tier-4.musicxml",
       "hands": "both",
+      "layers": [
+        "bass",
+        "harmony",
+        "melody"
+      ],
       "difficulty": 72.8,
       "range": {
         "low": 43,
@@ -54,5 +69,22 @@
     }
   ],
   "composer": "Ludwig van Beethoven",
-  "backing": "backing.mid"
+  "backing": {
+    "file": "backing.mid",
+    "style": "steady",
+    "tracks": [
+      {
+        "role": "bass",
+        "channel": 0
+      },
+      {
+        "role": "keys",
+        "channel": 1
+      },
+      {
+        "role": "drums",
+        "channel": 9
+      }
+    ]
+  }
 }

@@ -78,6 +78,9 @@ def write(
                 "level": t.tier.level,
                 "file": TIER_FILE.format(level=t.tier.level),
                 "hands": t.tier.hands,
+                # What the player's own hands cover here, so the app knows
+                # which of the band's roles to stand down.
+                "layers": sorted(t.tier.layers),
                 "difficulty": t.difficulty,
                 "range": {"low": t.low, "high": t.high},
             }
@@ -90,7 +93,18 @@ def write(
     if choices.origin:
         song["source"]["origin"] = choices.origin
     if arrangement.backing is not None:
-        song["backing"] = BACKING_FILE
+        style = arrangement.backing.style
+        channels = style.channels
+        song["backing"] = {
+            "file": BACKING_FILE,
+            "style": style.id,
+            # The app groups the backing's notes by channel to know which role
+            # it is hearing, so the channel is stated here rather than guessed
+            # from the order the tracks happen to be written in.
+            "tracks": [
+                {"role": layer.role, "channel": channels[layer.role]} for layer in style.layers
+            ],
+        }
 
     try:
         Draft202012Validator(_schema(schema_root)).validate(song)
@@ -107,7 +121,7 @@ def write(
         path = out / TIER_FILE.format(level=tier.tier.level)
         path.write_text(musicxml_text(tier.score), encoding="utf-8")
     if arrangement.backing is not None:
-        (out / BACKING_FILE).write_bytes(midi_bytes(arrangement.backing))
+        (out / BACKING_FILE).write_bytes(midi_bytes(arrangement.backing.score))
     (out / "song.json").write_text(json.dumps(song, indent=2) + "\n", encoding="utf-8")
     return song
 

@@ -42,8 +42,37 @@
     "time_signature": { "type": "string", "pattern": "^[0-9]+/[0-9]+$" },
     "tempo_bpm": { "type": "number", "exclusiveMinimum": 0 },
     "backing": {
-      "type": "string",
-      "description": "Path, relative to the bundle, of the backing MIDI: everything except the player's part."
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["file", "style", "tracks"],
+      "description": "The band: a generated accompaniment to play along with, never the player's own part.",
+      "properties": {
+        "file": {
+          "type": "string",
+          "description": "Path, relative to the bundle, of the backing MIDI."
+        },
+        "style": {
+          "type": "string",
+          "description": "Id of the style row the band was generated from."
+        },
+        "tracks": {
+          "type": "array",
+          "minItems": 1,
+          "description": "One per role, naming the MIDI channel it was written on.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["role", "channel"],
+            "properties": {
+              "role": {
+                "enum": ["bass", "keys", "drums"],
+                "description": "The app mutes a role the player's own level asks their hands to play."
+              },
+              "channel": { "type": "integer", "minimum": 0, "maximum": 15 }
+            }
+          }
+        }
+      }
     },
     "tiers": {
       "type": "array",
@@ -51,7 +80,7 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["level", "file", "hands", "difficulty", "range"],
+        "required": ["level", "file", "hands", "layers", "difficulty", "range"],
         "properties": {
           "level": {
             "type": "integer",
@@ -64,6 +93,13 @@
             "description": "Path, relative to the bundle, of this tier's MusicXML."
           },
           "hands": { "enum": ["right", "left", "both"] },
+          "layers": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "description": "What the player's own hands cover at this level. The app stands down the band's matching roles.",
+            "items": { "enum": ["melody", "bass", "harmony"] }
+          },
           "difficulty": {
             "type": "number",
             "minimum": 0,
