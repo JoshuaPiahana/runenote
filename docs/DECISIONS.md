@@ -151,16 +151,24 @@ through.
 
 ## The play-along keeps tempo. There is no wait mode.
 
-**Reason.** Wait mode was the plan from the start and was built, and the
-owner rejected it. So the line keeps moving at the song's tempo,
-and the music never stops for the player. The start gate stays: the run
-still begins on the player's own first note.
+**Reason.** The band. Since the backing became a band playing with the
+player, the music is the point of playing along, and wait mode breaks it:
+every hesitation stops the band dead, and a song that stops at every
+unknown note stops sounding like the song. Duolingo, whose play-along is the
+model here, has no wait mode either. That settles nothing on its own, but it
+shows the other way works. The answer to "I don't know this note yet" is the
+ladder: start at a level with fewer notes and fewer keys, and climb. Wait
+mode was built first and rejected by the owner. The start gate stays, so
+the run still begins on the player's own first note.
 
 **The cost, stated so it is not forgotten.** The case for wait mode was that a
 beginner at fixed tempo can flail and wait for the song to end, which teaches
-nothing. That risk is now real. The answers to it are the level ladder (fewer
-notes, fewer keys), slowing the tempo down (not built yet), and the per-bar
-record, which shows which bars are being let go by.
+nothing. That risk is now real. The answers to it are the level ladder,
+slowing the tempo down (not built yet), the per-bar record, which shows which
+bars are being let go by, and checkpoints (queued, not built). With
+checkpoints, missing too many notes in a short stretch takes the player back a
+few bars to try that stretch again, so flailing can no longer carry them to the
+end of the song.
 
 **As built.** A press counts as a hit when a written note of that pitch starts
 within 200 ms either side of the play line and has not been claimed. The
