@@ -69,7 +69,8 @@ def test_a_pickup_written_in_its_own_metre_does_not_set_the_songs(tmp_path: Path
 
 def test_a_key_signature_the_notes_contradict_gives_way(tmp_path: Path) -> None:
     # A sequencer's default "no sharps" over music in G major.
-    assert load(orchestra.write(tmp_path / "g.mid")).key.sharps == 1
+    path = orchestra.write(tmp_path / "g.mid")
+    assert load(path).key.sharps == 1
 
 
 def test_a_key_signature_the_notes_agree_with_stands(ode: Source) -> None:
