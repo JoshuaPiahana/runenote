@@ -10,7 +10,7 @@
 // of anything the app cannot do without: a run that fails to save is a run
 // not remembered, never an error in the player's face.
 
-import type { BarRecord } from "./follow";
+import type { BarRecord } from "./judge";
 
 export interface RunRecord {
   pack: string;
@@ -18,7 +18,7 @@ export interface RunRecord {
   level: number;
   /** When the run finished, as an ISO timestamp. */
   finished: string;
-  mode: "wait";
+  mode: "tempo";
   bars: BarRecord[];
 }
 
@@ -47,23 +47,17 @@ export function saveRun(
 }
 
 /**
- * One line for the end of a run: how many notes were found first time, and
- * the bar that held the player up longest, which is the one to practise.
- * Waiting is the measure rather than wrong notes because wait mode lets a
- * player who does not know a note simply stop, and a count of wrong notes
- * never sees that.
+ * One line for the end of a run: how many notes were hit, and the bar with
+ * the most notes missed or fumbled, which is the one to practise.
  */
 export function summarise(bars: BarRecord[]): string {
   const notes = bars.reduce((sum, b) => sum + b.notes, 0);
-  const clean = bars.reduce((sum, b) => sum + b.clean, 0);
-  const slowest = bars.reduce<BarRecord | undefined>(
-    (worst, b) => (worst && worst.longestWaitMs >= b.longestWaitMs ? worst : b),
+  const hit = bars.reduce((sum, b) => sum + b.hit, 0);
+  const trouble = (b: BarRecord) => b.missed + b.wrong;
+  const worst = bars.reduce<BarRecord | undefined>(
+    (w, b) => (w && trouble(w) >= trouble(b) ? w : b),
     undefined,
   );
-  const found = `${clean} of ${notes} notes first time.`;
-  // Under a second at one note is reading, not being stuck. A guess at the
-  // line, not measured: revisit once there are real runs to look at.
-  return slowest && slowest.longestWaitMs >= 1000
-    ? `${found} Bar ${slowest.bar} held you up most.`
-    : found;
+  const found = `${hit} of ${notes} notes hit.`;
+  return worst && trouble(worst) > 0 ? `${found} Bar ${worst.bar} is the one to practise.` : found;
 }

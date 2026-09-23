@@ -1,8 +1,7 @@
 // The band, made audible.
 //
 // The playhead is the clock, and it is not wall-clock time: it stops at a
-// pause, jumps back when a run restarts, and in wait mode it will stop dead
-// until the player finds the next note. So the backing cannot be started and
+// pause and jumps back when a run restarts. So the backing cannot be started and
 // left to run. It has to be scheduled *from* the playhead, a fraction of a
 // second at a time.
 //
@@ -15,7 +14,7 @@
 //
 // The look-ahead is deliberately short, because everything handed over is
 // going to be heard. A generous one would keep the band playing for a moment
-// after the player stopped, which in wait mode is exactly the wrong moment.
+// after the player paused, which is exactly the wrong moment.
 
 import type { BackingTrack, Role } from "./bundle";
 import type { BackingNote } from "./smf";
@@ -56,12 +55,8 @@ export class Scheduler {
     this.at = Number.NaN;
   }
 
-  /**
-   * Call once a frame while the playhead is moving. Nothing at or after
-   * `until` is handed over: in wait mode that is the note the player has not
-   * found yet, and the band comes in with them, not ahead of them.
-   */
-  follow(quarters: number, bpm: number, until = Number.POSITIVE_INFINITY): void {
+  /** Call once a frame while the playhead is moving. */
+  follow(quarters: number, bpm: number): void {
     const secondsPerQuarter = 60 / Math.max(bpm, 1);
     // A playhead that went backwards, or forwards further than a beat in one
     // frame, is a restart or a seek rather than the music running on, so what
@@ -71,7 +66,7 @@ export class Scheduler {
     }
     this.at = quarters;
 
-    const horizon = Math.min(quarters + this.lookahead / secondsPerQuarter, until);
+    const horizon = quarters + this.lookahead / secondsPerQuarter;
     const from = Math.max(this.upTo, quarters);
     while (this.cursor < this.notes.length) {
       const note = this.notes[this.cursor];
@@ -170,8 +165,8 @@ export class Band {
     this.standingDown = new Set(roles);
   }
 
-  follow(quarters: number, bpm: number, until?: number): void {
-    this.scheduler.follow(quarters, bpm, until);
+  follow(quarters: number, bpm: number): void {
+    this.scheduler.follow(quarters, bpm);
   }
 
   /** The playhead has stopped, so the band stops with it. */

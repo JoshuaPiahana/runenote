@@ -263,9 +263,14 @@ h1 {
   display: none;
 }
 
-/* A note found: its hold-bar fills and its head glows, so what has been
-   played reads at a glance as the line moves on. */
-#staff rect.hit {
+/* Hold-bars are drawn but hidden: a bar appears only for a note the player
+   has played, and grows while they hold it (score.ts). What has been played
+   reads at a glance, and a note let go early shows a short bar. */
+#staff rect[data-i] {
+  opacity: 0;
+}
+
+#staff rect[data-i].hit {
   opacity: 0.85;
 }
 

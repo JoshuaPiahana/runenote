@@ -149,26 +149,33 @@ an error and skipped, and core still plays.
 private ones, because rules with exceptions eventually let the wrong file
 through.
 
-## Wait mode ("Fermata mode") is the default play-along. Tempo mode is opt-in.
+## The play-along keeps tempo. There is no wait mode.
 
-**Reason.** A beginner's errors come from not yet knowing the next note, not
-from being slow. Waiting on the correct note turns every mistake into an
-immediate retrieval attempt instead of a missed note scrolling past. Tempo mode
-is for when the notes are known and fluency is the goal.
+**Reason.** Wait mode was the plan from the start and was built, and the
+owner rejected it. So the line keeps moving at the song's tempo,
+and the music never stops for the player. The start gate stays: the run
+still begins on the player's own first note.
 
-**Not doing.** Scrolling notation at a fixed tempo as the primary mode. It
-scores well and feels like a game, but at fixed tempo a beginner's failure mode
-is to flail and wait for the song to end, which teaches nothing.
+**The cost, stated so it is not forgotten.** The case for wait mode was that a
+beginner at fixed tempo can flail and wait for the song to end, which teaches
+nothing. That risk is now real. The answers to it are the level ladder (fewer
+notes, fewer keys), slowing the tempo down (not built yet), and the per-bar
+record, which shows which bars are being let go by.
 
-**As built.** The line runs up to the next moment with an unplayed note and
-stands there. A chord wants every note, in any order. The right pitch counts
-whenever it comes, early included, because rushing is a rhythm fault and
-rhythm is tempo mode's to judge. A wrong note is drawn as a ring on the line
-or space of the key pressed, so the player sees how far off it was, not just
-that it was wrong. The band holds back its notes on the waiting beat and comes
-in with the player. Wait mode is also why output latency does not matter yet:
-nothing here is judged against a clock. It will matter for tempo mode, which
-needs the tap-along calibration first.
+**As built.** A press counts as a hit when a written note of that pitch starts
+within 200 ms either side of the play line and has not been claimed. The
+nearest such note is claimed. Anything else is a wrong note, drawn as a ring on
+the line or space of the key pressed, so the player sees how far off it was.
+A note the line carries past without a press is a miss. The 200 ms is a guess,
+chosen to be generous to a beginner on an uncalibrated machine.
+
+A hold-bar is not drawn until its note is played. It then grows out of the
+notehead with the play line while the key is held, and stops when the key comes
+up, so a note let go early leaves a short bar. A missed note never gets one.
+
+**Not doing, yet.** Judging against the output delay. Each hit's offset is
+recorded instead, so the tap-along calibration can be checked against how
+real runs sit.
 
 ## Per-bar accuracy is recorded from the first version.
 
@@ -177,13 +184,10 @@ hand alone, half speed"), Survival's difficulty ramp, and Quests' revisit
 steps. Retrofitting it later means the early practice data is lost.
 
 **As built.** Each finished run appends one record per bar: notes written,
-notes found before any wrong note at that moment, wrong notes, total waiting,
-and the longest single wait. That last one is how wait mode reveals a note the
-player did not know, which a wrong-note count cannot see, since they could
-simply stop and look. The records are kept raw, and grading them is left to
-whoever reads them. They live in the browser's local storage, which is fine for
-one family on one machine but easy to lose. A run abandoned with restart is
-not recorded.
+hit, missed, wrong, and each hit's timing offset in ms. The records are kept
+raw, and grading them is left to whoever reads them. They live in the
+browser's local storage, which is fine for one family on one machine but easy
+to lose. A run abandoned with restart is not recorded.
 
 **Not doing.** A global score only.
 
@@ -293,11 +297,10 @@ tenth of a second of *playhead* time and hands those to the audio clock with
 exact times. Nothing is ever simply started and left playing.
 
 **Reason.** The playhead is not wall-clock time. It stops when the player
-pauses, jumps back when a run restarts, and in wait mode — the default
-play-along — it stops dead until the player finds the next note. A backing
-running on its own clock would come apart the first time a seven year old
-hesitated, and the first thing they would learn is that the app's timing is
-not to be trusted.
+pauses and jumps back when a run restarts. (It was also going to stop dead in
+wait mode, which was dropped; see "The play-along keeps tempo".) A backing
+running on its own clock would come apart at the first pause, and the first
+thing a child would learn is that the app's timing is not to be trusted.
 
 Scheduling from the playhead also puts the two clocks where each is good.
 Frames are jittery and timers are coarse, so neither can place a note on a

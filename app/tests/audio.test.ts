@@ -91,20 +91,6 @@ describe("Scheduler", () => {
     expect(heard.map((h) => h.start)).toEqual([0, 1]);
   });
 
-  it("waits with the player: nothing on the unplayed note goes early, and it comes in with them", () => {
-    const { it: sched, heard } = scheduler([note(0.9), note(1), note(1.1)]);
-    // The playhead is held just short of the note the player has not found.
-    sched.follow(0.8, BPM, 1);
-    sched.follow(1, BPM, 1);
-    sched.follow(1, BPM, 1);
-    expect(heard.map((h) => h.start)).toEqual([0.9]);
-    // Found: the band's note on that beat sounds now, with theirs.
-    sched.follow(1, BPM, 2);
-    expect(heard.map((h) => h.start)).toEqual([0.9, 1, 1.1]);
-    expect(heard[1]?.delay).toBe(0);
-    expect(heard[2]?.delay).toBeCloseTo(0.05);
-  });
-
   it("plays a note that sits exactly on the playhead", () => {
     const { it: sched, heard } = scheduler([note(4)]);
     sched.follow(4, BPM);
