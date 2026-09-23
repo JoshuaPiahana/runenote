@@ -136,6 +136,15 @@ repo and are imported at runtime. The pack format is a JSON Schema checked by
 both sides, so anything that validates plays. CI enforces the licence allowlist
 and the core-only rule; the tests encode the rule, not a single example.
 
+"Outside the repo" means outside git, not outside the checkout: a family pack
+is a directory beside core, `content/packs/<id>/`, which `.gitignore` already
+refuses. The dev server lists every directory there holding a `pack.json`
+(`/packs/index.json`), so a pack appears on reload without any code naming it.
+It sits in the checkout because that is the one place the pipeline and app
+containers can both already see; a second mount for a folder elsewhere would
+be one more path for Git Bash to mangle. A pack that fails to load is shown as
+an error and skipped, and core still plays.
+
 **Not doing.** Committing fan arrangements to any branch, ever, including
 private ones, because rules with exceptions eventually let the wrong file
 through.
@@ -166,6 +175,14 @@ for free and make the melody hard to find. Piano sheet music (NinSheetMusic,
 MuseScore, IMSLP) gives the melody and a clean two-hand arrangement and no
 backing. They are mirror images, so both feed one model of melody, chord track
 and backing tracks, and everything downstream is shared.
+
+Since the band became generated, the backing no longer comes from any source,
+so what matters in a MIDI file is the same as in MusicXML: a melody part and
+some harmony. The MIDI door is therefore just a second way to read piano sheet
+music, because MIDI is the format NinSheetMusic reliably offers beside the
+PDF; its notation source files, where present, are not MusicXML. It is quantised to sixteenths and eighth-note triplets on the way
+in. A test holds the rule that a MIDI export of a score arranges to exactly
+the notes the score does.
 
 **Not doing.** Treating either format as the canonical source.
 

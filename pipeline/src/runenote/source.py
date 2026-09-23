@@ -1,8 +1,11 @@
 """Load a source file into what the arranger needs: the score, its parts, and
 the facts about it a bundle must state.
 
-Only MusicXML today. The MIDI importer the plan calls for lands with the
-first MIDI source worth arranging; both feed this same :class:`Source`.
+MusicXML or MIDI; both feed this same :class:`Source`. MIDI is how most game
+piano arrangements are published (NinSheetMusic offers MIDI, not MusicXML),
+so it is quantised on the way in: a notation program's MIDI export is
+already on the grid, and rounding to sixteenths and triplet eighths only
+removes the odd tick of drift.
 """
 
 from __future__ import annotations
@@ -14,6 +17,10 @@ from statistics import fmean
 from music21 import converter, key, meter, stream, tempo
 
 MUSICXML_SUFFIXES = frozenset({".musicxml", ".mxl", ".xml"})
+MIDI_SUFFIXES = frozenset({".mid", ".midi"})
+# Sixteenths and eighth-note triplets. Finer divisions would keep a
+# performance's slop as written rhythm, which the tiers then have to read.
+MIDI_GRID = (4, 3)
 
 # When a source states no tempo, this is a guess and the CLI says so.
 DEFAULT_TEMPO_BPM = 120.0
@@ -46,6 +53,11 @@ class Source:
     time_signature: str
     tempo_bpm: float
     tempo_is_default: bool
+
+    @property
+    def kind(self) -> str:
+        """What song.json records as the source's format."""
+        return "midi" if self.path.suffix.lower() in MIDI_SUFFIXES else "musicxml"
 
     @property
     def parts(self) -> list[PartInfo]:
@@ -82,10 +94,15 @@ class Source:
 
 
 def load(path: Path, *, tempo_bpm: float | None = None) -> Source:
-    if path.suffix.lower() not in MUSICXML_SUFFIXES:
-        msg = f"{path}: not a MusicXML file (expected one of {sorted(MUSICXML_SUFFIXES)})"
+    suffix = path.suffix.lower()
+    if suffix in MUSICXML_SUFFIXES:
+        parsed = converter.parse(path)
+    elif suffix in MIDI_SUFFIXES:
+        parsed = converter.parse(path, quantizePost=True, quarterLengthDivisors=MIDI_GRID)
+    else:
+        known = sorted(MUSICXML_SUFFIXES | MIDI_SUFFIXES)
+        msg = f"{path}: not a MusicXML or MIDI file (expected one of {known})"
         raise SourceError(msg)
-    parsed = converter.parse(path)
     if not isinstance(parsed, stream.Score):
         msg = f"{path}: parsed as {type(parsed).__name__}, not a score"
         raise SourceError(msg)
@@ -107,7 +124,8 @@ def load(path: Path, *, tempo_bpm: float | None = None) -> Source:
     return Source(
         path=path,
         score=parsed,
-        title=parsed.metadata.bestTitle if parsed.metadata else path.stem,
+        # A MIDI file seldom names its piece; the file name is the next best.
+        title=(parsed.metadata.bestTitle if parsed.metadata else None) or path.stem,
         composer=parsed.metadata.composer if parsed.metadata else None,
         key=_written_key(parsed),
         time_signature=signatures[0].ratioString,
