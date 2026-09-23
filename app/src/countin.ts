@@ -72,3 +72,17 @@ export function countInNotes(
   }
   return out.sort((a, b) => a.start - b.start);
 }
+
+/**
+ * Where the count-in's barlines are drawn: between its bars and at its end,
+ * on the grid the band plays, so the line crosses a barline as the band turns
+ * the bar. The start needs none: the clef stands there.
+ */
+export function countInBarlines(
+  bars: readonly number[],
+  length: number,
+  count = COUNT_IN_BARS,
+): number[] {
+  const start = countInStart(bars, length, count);
+  return Array.from({ length: count }, (_, k) => start + (k + 1) * length);
+}

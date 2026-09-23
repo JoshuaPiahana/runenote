@@ -291,17 +291,27 @@ miniature, before the song has started.
 **Amended: the start note is a trigger, not the song's first note.** It used
 to start the music at the first note, so the tempo arrived just as it was
 needed and the player had to catch it on the fly. Now it starts two bars of
-the song's own band (its first whole bar, twice), with the beat counted on
-screen and the music sliding in towards the line at the speed it will be
-played. The melody comes in after. This is still not the metronome lead-in
+the song's own band (its first whole bar, twice). The melody comes in after.
+This is still not the metronome lead-in
 ruled out below: the player starts it, and it is the song's band, not a
 click. It lives in the app, not as a bar written into the bundle, because a
 bar 0 would renumber every bar and break the per-bar records. Keys pressed
 during the count-in are not judged.
 
+**Amended: the count-in is drawn, and the start note is read, not named.**
+Its two bars sit on the stave in front of bar 1, empty but for one small note
+at the start: the song's opening note, under the play line, and that is what
+the player plays to begin. Before this the line started two bars short of the
+drawing and glided over nothing while the band played, which read as broken,
+and the start was a caption ("Play E4 to start") that could be obeyed without
+looking at the stave, which skipped the one skill the gate exists to
+practise. The count is not shown either: the drums say it, and a counter
+under the stave that vanished when the song began jolted the stave as it went.
+Whatever the gate line says, it keeps its space, so text never moves the music.
+
 Any note of the opening counts, so a two-hand piece does not demand a four-note
-chord be struck together to begin; the prompt names one note, the top of the
-melody, because naming four reads as an instruction to play a chord. The gate
+chord be struck together to begin; the small note drawn is one of them, the top
+of the melody, because drawing four reads as an instruction to play a chord. The gate
 is re-armed after every run, so looping the song never scrolls past a player
 who has stopped to think.
 

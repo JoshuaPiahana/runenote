@@ -302,8 +302,11 @@ h1 {
   padding: 8px;
 }
 
+/* The gate keeps its line whether or not it has anything to say: the stage
+   is centred, so a line coming and going would jolt the music up and down. */
 .gate {
   margin: 10px 0 0;
+  min-height: 1.4em;
   text-align: center;
   font-size: 17px;
   font-weight: 600;
@@ -311,7 +314,8 @@ h1 {
 }
 
 .gate[hidden] {
-  display: none;
+  display: block;
+  visibility: hidden;
 }
 
 .hint {

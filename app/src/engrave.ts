@@ -301,7 +301,25 @@ export function quarterWidth(engraving: Engraving): number {
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;");
 const f = (n: number) => Math.round(n * 10) / 10;
 
-export function layout(engraving: Engraving, ink: Ink): Layout {
+/**
+ * The count-in, drawn in front of bar 1 so the line has music under it from
+ * the first beat instead of gliding over nothing. Its bars are empty but for
+ * one small note at the very start: the song's opening note, which is what
+ * the player plays to begin, so their hand is already where the song wants it.
+ */
+export interface Lead {
+  /** Where the count-in starts, in quarters before the song: negative. */
+  from: number;
+  /** Barlines inside the count-in and at its end. */
+  barlines: number[];
+  /** The opening note to show small, found among the song's first notes. */
+  cue?: { midi: number; hand: Hand };
+}
+
+/** The cue is a reminder of where to put the hand, not a note of the song. */
+const CUE_SCALE = 0.7;
+
+export function layout(engraving: Engraving, ink: Ink, lead?: Lead): Layout {
   const { staves, notes, bars, fifths, time } = engraving;
   const W = quarterWidth(engraving);
   const tops = staves.map((_, i) => MARGIN + i * (SPACE * 4 + STAFF_GAP));
@@ -341,7 +359,9 @@ export function layout(engraving: Engraving, ink: Ink): Layout {
   const keyCount = Math.min(Math.abs(fifths), 7);
   const timeX = keyX + keyCount * SPACE * 1.1 + (keyCount ? SPACE * 0.6 : 0);
   const headerEnd = timeX + (time ? SPACE * 2.6 : 0);
-  const origin = headerEnd + SPACE * 2.5;
+  // Quarter 0 moves right by the count-in, so the count-in starts where the
+  // song would have: just after the header.
+  const origin = headerEnd + SPACE * 2.5 - (lead?.from ?? 0) * W;
   const endX = origin + engraving.end * W;
   const width = endX + SPACE * 3;
 
@@ -416,6 +436,42 @@ export function layout(engraving: Engraving, ink: Ink): Layout {
   );
   // A grand staff is one instrument: its barlines join the staves, and a
   // brace would too; the brace is left to the traditional view.
+
+  // The count-in's bars carry no numbers: bar 1 is still the song's first.
+  for (const q of lead?.barlines ?? []) {
+    const x = barlineX(q);
+    barlines.push(x);
+    back.push(
+      `<line x1="${f(x)}" x2="${f(x)}" y1="${f(top0)}" y2="${f(bottomN)}" stroke="${ink.music}" stroke-width="1.4"/>`,
+    );
+  }
+  const opening = notes[0]?.start;
+  const cue =
+    lead?.cue &&
+    notes.find(
+      (n) => n.start === opening && n.midi === lead.cue?.midi && n.hand === lead.cue?.hand,
+    );
+  if (lead && cue) {
+    const x = origin + lead.from * W;
+    const y = yOf(cue.staff, cue.step);
+    const colour = cue.hand === "left" ? ink.left : ink.right;
+    mid.push(...ledgers(cue.staff, cue.step, x, ink.music));
+    front.push(
+      `<ellipse class="cue" cx="${f(x)}" cy="${f(y)}" rx="${f(HEAD_RX * CUE_SCALE)}" ry="${f(HEAD_RY * CUE_SCALE)}" transform="rotate(-20 ${f(x)} ${f(y)})" fill="${colour}"/>`,
+    );
+    if (cue.accidental) {
+      const glyph = {
+        sharp: "♯",
+        flat: "♭",
+        natural: "♮",
+        "double-sharp": "𝄪",
+        "double-flat": "𝄫",
+      }[cue.accidental];
+      front.push(
+        `<text x="${f(x - HEAD_RX * CUE_SCALE - SPACE * 0.3)}" y="${f(y + SPACE * 0.4)}" text-anchor="end" font-size="${f(SPACE * 2 * CUE_SCALE)}" fill="${colour}">${esc(glyph)}</text>`,
+      );
+    }
+  }
 
   // Notes, one chord (same staff, same moment) at a time.
   const heads: Layout["heads"] = [];
