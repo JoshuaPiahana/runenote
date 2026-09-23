@@ -94,6 +94,22 @@ h1 {
   margin: -4px;
 }
 
+/* A pack's name above its songs: a full row of the grid, never a card, so
+   focus steps straight over it. */
+.shelf {
+  grid-column: 1 / -1;
+  margin: 12px 0 0;
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.7;
+}
+
+.shelf:first-child {
+  margin-top: 0;
+}
+
 .card {
   appearance: none;
   display: flex;
