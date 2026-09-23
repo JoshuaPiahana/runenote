@@ -264,14 +264,25 @@ h1 {
 }
 
 /* Hold-bars are drawn but hidden: a bar appears only for a note the player
-   has played, and grows while they hold it (score.ts). What has been played
-   reads at a glance, and a note let go early shows a short bar. */
+   has played, as a progress bar. The track shows how long to hold, the fill
+   how long they have (score.ts). When the note is over, or let go, both fade:
+   bars left behind would crowd the line with notes already done. */
 #staff rect[data-i] {
   opacity: 0;
 }
 
 #staff rect[data-i].hit {
-  opacity: 0.85;
+  opacity: 0.3;
+}
+
+#staff rect.fill {
+  opacity: 0.95;
+}
+
+/* .hit as well, to outrank the track's own rule above. */
+#staff rect.hit.done {
+  opacity: 0;
+  transition: opacity 0.35s ease-out;
 }
 
 #staff ellipse.hit {

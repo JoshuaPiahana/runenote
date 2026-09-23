@@ -31,6 +31,21 @@ const LINE_INK = "#353c52";
 /** How long a wrong note stays on the line. Matches the fade in style.css. */
 const WRONG_FADE_MS = 1400;
 
+/** A played note's hold-bar: the faint track, and the fill growing over it. */
+interface Fill {
+  track: SVGRectElement;
+  rect: SVGRectElement;
+  start: number;
+  full: number;
+  midi: number;
+}
+
+/** The note is over: its bar fades (style.css), track and fill together. */
+function finish(fill: Fill): void {
+  fill.track.classList.add("done");
+  fill.rect.classList.add("done");
+}
+
 /**
  * Writes a colour onto every note, chosen by the part it belongs to, so the
  * two hands are told apart at a glance. Done here rather than in the pipeline
@@ -78,8 +93,8 @@ export class Score {
   private line: HTMLElement;
   private view: ScoreView = "scrolling";
   private drawn: Layout | undefined;
-  /** Bars of notes being held, growing with the play line. */
-  private fills: { rect: SVGRectElement; start: number; full: number; midi: number }[] = [];
+  /** Bars of notes being held, filling with the play line. */
+  private fills: Fill[] = [];
   // OSMD holds one sheet and `load` replaces it, so loads must not overlap: a
   // slow one finishing after a fast one would leave the drawing and the sheet
   // disagreeing. Requests queue, and one overtaken before it starts is dropped.
@@ -140,11 +155,13 @@ export class Score {
 
   /**
    * Lights a written note the player has played, and starts its hold-bar.
-   * The bar is not drawn until then: it grows out of the notehead with the
-   * play line for as long as the key is held, up to the note's written
-   * length, so it shows how long the player actually held it against how
-   * long they were asked to. Only the moving view shows feedback: the page
-   * is for reading, and marks on it would stay.
+   * The bar is not drawn until then. It shows as a progress bar: a faint
+   * track the note's written length, filling with colour from the notehead
+   * as the play line crosses it, so the player sees how much longer to hold.
+   * Once the note is over, or the key comes up, the bar fades: a finished
+   * note needs no more attention, and the notehead's glow still says it was
+   * played. Only the moving view shows feedback: the page is for reading,
+   * and marks on it would stay.
    */
   hit(note: { start: number; midi: number; hand: string }): void {
     const index = this.drawn?.heads.findIndex(
@@ -159,10 +176,15 @@ export class Score {
     for (const element of this.line.querySelectorAll(`[data-i="${index}"]`)) {
       element.classList.add("hit");
       if (element instanceof SVGRectElement) {
-        const full = Number(element.dataset.full ?? element.getAttribute("width"));
-        element.dataset.full = String(full);
-        element.setAttribute("width", "0");
-        this.fills.push({ rect: element, start: note.start, full, midi: note.midi });
+        // The fill is a copy of the track laid over it, grown from nothing.
+        // It carries no data-i, so it is never mistaken for a written note.
+        const fill = element.cloneNode(false) as SVGRectElement;
+        fill.removeAttribute("data-i");
+        fill.classList.add("fill");
+        fill.setAttribute("width", "0");
+        element.after(fill);
+        const full = Number(element.getAttribute("width"));
+        this.fills.push({ track: element, rect: fill, start: note.start, full, midi: note.midi });
       }
     }
   }
@@ -172,19 +194,31 @@ export class Score {
     this.line.querySelector(".cue")?.classList.add("hit");
   }
 
-  /** Grows every held note's bar to where the play line has reached. */
+  /** Fills every held note's bar to where the play line has reached, and
+      lets go of any that are full. */
   follow(quarters: number): void {
     const perQuarter = this.drawn?.pxPerQuarter ?? 0;
     this.fills = this.fills.filter((fill) => {
       const width = Math.min(Math.max((quarters - fill.start) * perQuarter, 0), fill.full);
       fill.rect.setAttribute("width", width.toFixed(1));
-      return width < fill.full;
+      if (width < fill.full) {
+        return true;
+      }
+      finish(fill);
+      return false;
     });
   }
 
-  /** A key came up: its bar stops where it is, short if let go early. */
+  /** A key came up: its bar stops where it is, short if let go early, and
+      fades with the rest. */
   release(midi: number): void {
-    this.fills = this.fills.filter((fill) => fill.midi !== midi);
+    this.fills = this.fills.filter((fill) => {
+      if (fill.midi !== midi) {
+        return true;
+      }
+      finish(fill);
+      return false;
+    });
   }
 
   /** Rings a key pressed that was not wanted, where it was pressed. It fades
@@ -205,11 +239,11 @@ export class Score {
   /** Takes every mark off, for a fresh run over the same drawing. */
   clearFeedback(): void {
     this.fills = [];
-    for (const rect of this.line.querySelectorAll<SVGRectElement>("rect[data-full]")) {
-      rect.setAttribute("width", rect.dataset.full ?? "0");
+    for (const element of this.line.querySelectorAll(".fill")) {
+      element.remove();
     }
-    for (const element of this.line.querySelectorAll(".hit")) {
-      element.classList.remove("hit");
+    for (const element of this.line.querySelectorAll(".hit, .done")) {
+      element.classList.remove("hit", "done");
     }
     for (const element of this.line.querySelectorAll(".wrong")) {
       element.remove();
