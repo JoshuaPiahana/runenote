@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pytest
 
-from fixtures import ode_to_joy
+from fixtures import ode_to_joy, orchestra
 from runenote.arrange import arrange
 from runenote.source import Source, SourceError, load
 from runenote.tiers import load_tiers
@@ -58,3 +58,21 @@ def test_other_formats_are_refused(tmp_path: Path) -> None:
     pdf.write_bytes(b"%PDF")
     with pytest.raises(SourceError, match="not a MusicXML or MIDI file"):
         load(pdf)
+
+
+def test_a_pickup_written_in_its_own_metre_does_not_set_the_songs(tmp_path: Path) -> None:
+    # Song of Time arrives from NinSheetMusic as one bar of 1/4, then 4/4.
+    tune = orchestra.Track("Tune", 0, 0, [(0, 1, 69), (1, 2, 62), (3, 1, 65), (4, 1, 69)])
+    path = orchestra.write(tmp_path / "t.mid", [tune], signatures=[(0, 1, 4), (1, 4, 4)])
+    assert load(path).time_signature == "4/4"
+
+
+def test_a_key_signature_the_notes_contradict_gives_way(tmp_path: Path) -> None:
+    # A sequencer's default "no sharps" over music in G major.
+    assert load(orchestra.write(tmp_path / "g.mid")).key.sharps == 1
+
+
+def test_a_key_signature_the_notes_agree_with_stands(ode: Source) -> None:
+    # Ode to Joy is written in D major and plays in it; analysis must not
+    # talk the pipeline out of the composer's signature.
+    assert str(ode.key) == "D major"
