@@ -4,19 +4,15 @@
 // The engraving is OpenSheetMusicDisplay's; what this adds is time. OSMD lays
 // a score out in space and says nothing about when a note happens, so after
 // rendering we read the laid-out sheet once and record where each moment sits
-// in pixels. Everything after that is interpolation between those points,
-// which is why scrolling is smooth and stays in step with notes of any length.
+// in pixels. Turning those points into motion is timeline.ts's job.
 
 import { ColoringModes, type IOSMDOptions, OpenSheetMusicDisplay } from "opensheetmusicdisplay";
+import { type Point, Timeline } from "./timeline";
 
 export type ScoreView = "scrolling" | "traditional";
 
-/** A moment in the music and the pixel it was drawn at. */
-interface Point {
-  /** Quarter notes from the start. */
-  t: number;
-  x: number;
-}
+/** Nothing to scroll: the sheet stands where it was drawn. */
+const STILL = new Timeline([], 0);
 
 /** OSMD timestamps count whole notes; the rest of the app counts quarters. */
 const QUARTERS_PER_WHOLE = 4;
@@ -102,8 +98,7 @@ ${new XMLSerializer().serializeToString(doc.documentElement)}`;
 export class Score {
   private osmd: OpenSheetMusicDisplay;
   private view: ScoreView = "scrolling";
-  private points: Point[] = [];
-  private end = 0;
+  private timeline = STILL;
   // OSMD holds one sheet and `load` replaces it, so loads must not overlap: a
   // slow one finishing after a fast one would leave the drawing and the sheet
   // disagreeing. Requests queue, and one overtaken before it starts is dropped.
@@ -124,7 +119,7 @@ export class Score {
       this.osmd.setOptions(VIEWS[view]);
       await this.osmd.load(colourNotesByHand(musicXml, right, left));
       this.osmd.render();
-      this.points = view === "scrolling" ? this.mapTimeToPixels() : [];
+      this.timeline = view === "scrolling" ? this.mapTimeToPixels() : STILL;
     });
     this.queue = run.catch(() => undefined);
     return run;
@@ -138,7 +133,7 @@ export class Score {
    * Both staves carry an entry at the same moment, so the leftmost wins and
    * the two hands stay on one timeline.
    */
-  private mapTimeToPixels(): Point[] {
+  private mapTimeToPixels(): Timeline {
     const byTime = new Map<number, number>();
     let rightEdge = 0;
     try {
@@ -158,53 +153,19 @@ export class Score {
     } catch {
       // A layout we cannot read is not worth failing the screen over; the
       // sheet still draws, it just does not scroll.
-      return [];
+      return STILL;
     }
     if (byTime.size < 2 || rightEdge <= 0) {
-      return [];
+      return STILL;
     }
     const scale = UNIT_IN_PIXELS * (this.osmd.zoom || 1);
-    this.end = rightEdge * scale;
-    return [...byTime.entries()].map(([t, x]) => ({ t, x: x * scale })).sort((a, b) => a.t - b.t);
+    const points: Point[] = [...byTime.entries()].map(([t, x]) => ({ t, x: x * scale }));
+    return new Timeline(points, rightEdge * scale);
   }
 
   /** Pixel x of a moment, in the rendered sheet's own coordinates. */
   positionAt(quarters: number): number {
-    const points = this.points;
-    if (points.length < 2) {
-      return 0;
-    }
-    const first = points[0];
-    const last = points[points.length - 1];
-    if (!first || !last) {
-      return 0;
-    }
-    if (quarters <= first.t) {
-      return first.x;
-    }
-    // Past the last onset, keep moving at the last known speed so the final
-    // note still travels to the play line instead of stopping short of it.
-    if (quarters >= last.t) {
-      const tail = Math.max(this.end - last.x, 0);
-      const span = Math.max(last.t - first.t, 1);
-      return last.x + Math.min((quarters - last.t) / span, 1) * tail;
-    }
-    let low = 0;
-    let high = points.length - 1;
-    while (high - low > 1) {
-      const mid = (low + high) >> 1;
-      if ((points[mid]?.t ?? 0) <= quarters) {
-        low = mid;
-      } else {
-        high = mid;
-      }
-    }
-    const a = points[low];
-    const b = points[high];
-    if (!a || !b || b.t === a.t) {
-      return a?.x ?? 0;
-    }
-    return a.x + ((quarters - a.t) / (b.t - a.t)) * (b.x - a.x);
+    return this.timeline.positionAt(quarters);
   }
 
   get isScrolling(): boolean {
