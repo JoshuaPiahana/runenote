@@ -116,7 +116,7 @@ export function rolesCovered(layers: readonly string[]): Role[] {
 // the code. The levels below were set by eye against the velocities the style
 // table writes, and want a pass by ear.
 
-const LEVEL: Record<Role, number> = { bass: 0.5, keys: 0.22, drums: 0.3 };
+const LEVEL: Record<Role, number> = { bass: 0.5, keys: 0.22, drums: 0.3, colour: 0.2 };
 /** The player's own notes, for a keyboard that makes no sound of its own. */
 const PLAYER_LEVEL = 0.5;
 /** General MIDI percussion. Anything else the table grows gets the tick. */
@@ -215,11 +215,13 @@ export class Band {
       return;
     }
     const osc = ctx.createOscillator();
-    osc.type = role === "bass" ? "triangle" : "sawtooth";
+    // Colour is bell-like, so an echo or a counter-melody stands apart from
+    // the keys' chords rather than thickening them.
+    osc.type = role === "bass" || role === "colour" ? "triangle" : "sawtooth";
     osc.frequency.value = 440 * 2 ** ((midi - 69) / 12);
     const filter = ctx.createBiquadFilter();
     filter.type = "lowpass";
-    filter.frequency.value = role === "bass" ? 600 : 2400;
+    filter.frequency.value = role === "bass" ? 600 : role === "colour" ? 5000 : 2400;
     filter.Q.value = 0.7;
     const env = ctx.createGain();
     // Struck or plucked, not blown: no attack to speak of, then a decay that

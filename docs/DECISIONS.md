@@ -104,7 +104,24 @@ stops. At level 4 you have the chords too, and it is just you and a drummer.
 The band hands you its job one piece at a time, and the thinning is the point
 rather than a fault.
 
-**Not doing.** Shipping the source's leftover parts as the backing. One
+**Amended 2026-09-24: a sequenced orchestration may be its own band.** A fan
+MIDI of a game tune (VGMusic's) is already a band: strings, harp, bass and
+drums on their own tracks, each with its instrument, around one melody track.
+Generating three synthesised roles from its harmony throws that away. So for
+such a source the backing is the source's own parts, copied as sequenced,
+minus the melody, and a human gives every other part a role next to the
+melody choice: `bass` and `keys` stand down when the player's hands take them
+over, exactly as the band's do; `drums` and `colour` (echoes, counter-melodies,
+arpeggios the player's hands never reproduce) always play; `drop` leaves a part
+out. The left hand is read from the `bass` and `keys` parts only, and reduced
+to one hand (the bass line's rhythm, the chord closed up inside the octave
+above it), so what the band stops playing is exactly what the player starts
+playing. That keeps the rule this entry exists for. What it ruled out was never
+where the notes come from; it was playing the player's own part back at them.
+
+**Not doing.** Shipping the source's leftover parts as the backing without a
+role for each, and never for a piano source, whose leftovers are the left
+hand. One
 backing file per tier: there is one file, and the app mutes what the level
 covers. Inventing harmony where the song rests — the band's harmonic layers
 rest with the accompaniment, though the kit keeps the pulse. Putting a style
@@ -207,9 +224,10 @@ MuseScore, IMSLP) gives the melody and a clean two-hand arrangement and no
 backing. They are mirror images, so both feed one model of melody, chord track
 and backing tracks, and everything downstream is shared.
 
-Since the band became generated, the backing no longer comes from any source,
-so what matters in a MIDI file is the same as in MusicXML: a melody part and
-some harmony. The MIDI door is therefore just a second way to read piano sheet
+Since the band became generated, the backing no longer comes from a piano
+source, so what matters in one is the same in MIDI as in MusicXML: a melody
+part and some harmony. (A sequenced orchestration is the exception: its parts
+can be the band, by role; see the band's entry, amended 2026-09-24.) The MIDI door is therefore just a second way to read piano sheet
 music, because MIDI is the format NinSheetMusic reliably offers beside the
 PDF; its notation source files, where present, are not MusicXML. It is quantised to sixteenths and eighth-note triplets on the way
 in. A test holds the rule that a MIDI export of a score arranges to exactly

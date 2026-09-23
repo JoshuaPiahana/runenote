@@ -32,6 +32,12 @@
           "type": "integer",
           "minimum": 1,
           "description": "1-based index of the source part a human confirmed as the melody."
+        },
+        "roles": {
+          "type": "object",
+          "description": "For a backing played from the source's own parts: the role a human confirmed for every other part, by 1-based index. Also decides which parts the left hand is read from.",
+          "propertyNames": { "pattern": "^[1-9][0-9]*$" },
+          "additionalProperties": { "enum": ["bass", "keys", "drums", "colour", "drop"] }
         }
       }
     },
@@ -44,9 +50,13 @@
     "backing": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["file", "style", "tracks"],
-      "description": "The band: a generated accompaniment to play along with, never the player's own part.",
+      "required": ["file", "tracks"],
+      "description": "The band: an accompaniment to play along with, never the player's own part. Generated from the song's harmony, or played from the source's own parts by role.",
       "properties": {
+        "from": {
+          "enum": ["band", "source"],
+          "description": "'band' (the default): generated from the harmony by a style. 'source': the source's own parts, by the roles in source.roles."
+        },
         "file": {
           "type": "string",
           "description": "Path, relative to the bundle, of the backing MIDI."
@@ -58,21 +68,35 @@
         "tracks": {
           "type": "array",
           "minItems": 1,
-          "description": "One per role, naming the MIDI channel it was written on.",
+          "description": "One per track, naming the MIDI channel it was written on. A generated band has one per role; a source backing may have several parts in one role.",
           "items": {
             "type": "object",
             "additionalProperties": false,
             "required": ["role", "channel"],
             "properties": {
               "role": {
-                "enum": ["bass", "keys", "drums"],
-                "description": "The app mutes a role the player's own level asks their hands to play."
+                "enum": ["bass", "keys", "drums", "colour"],
+                "description": "The app mutes a role the player's own level asks their hands to play. Drums and colour are never the player's."
               },
-              "channel": { "type": "integer", "minimum": 0, "maximum": 15 }
+              "channel": { "type": "integer", "minimum": 0, "maximum": 15 },
+              "program": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 127,
+                "description": "General MIDI program, from 0, for a synth that can play it."
+              },
+              "part": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The source part this track was copied from, for a source backing."
+              }
             }
           }
         }
-      }
+      },
+      "if": { "properties": { "from": { "const": "source" } }, "required": ["from"] },
+      "then": { "not": { "required": ["style"] } },
+      "else": { "required": ["style"] }
     },
     "tiers": {
       "type": "array",

@@ -13,7 +13,7 @@ import pytest
 from music21 import chord, key, meter, stream
 
 from conftest import melody_only, source_from
-from runenote.arrange import ArrangedTier, ArrangeError, arrange, fold_plan, nearest_key
+from runenote.arrange import ArrangedTier, ArrangeError, Backing, arrange, fold_plan, nearest_key
 from runenote.source import Source
 from runenote.tiers import load_tiers
 
@@ -73,7 +73,7 @@ def test_one_key_for_every_level_chosen_for_the_easiest(ode: Source) -> None:
             signatures = part.flatten().getElementsByClass(key.KeySignature)
             assert [k.sharps for k in signatures] == [0], f"tier {tier.tier.level}"
     # The band moves with everything else: its first chord is C major, not D.
-    assert arrangement.backing is not None
+    assert isinstance(arrangement.backing, Backing)
     keys = arrangement.backing.score.getElementById("keys")
     assert isinstance(keys, stream.Part)
     opening = [n for n in keys.flatten().notes if float(n.offset) == 1.0]
