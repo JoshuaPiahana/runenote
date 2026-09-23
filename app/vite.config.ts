@@ -1,6 +1,48 @@
+import { existsSync, readdirSync } from "node:fs";
+import { resolve } from "node:path";
+import type { Plugin } from "vite";
 import { defineConfig } from "vitest/config";
 
+const PACKS_DIR = resolve(__dirname, "../content/packs");
+const INDEX = "/packs/index.json";
+
+/** Every directory under content/packs that holds a pack.json, core first.
+    A browser cannot list a directory, so the server says which packs exist.
+    That is what lets a family pack sit beside core, ignored by git, and
+    appear without any code naming it. */
+export function listPacks(dir = PACKS_DIR): string[] {
+  if (!existsSync(dir)) {
+    return [];
+  }
+  const ids = readdirSync(dir, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory() && existsSync(resolve(dir, entry.name, "pack.json")))
+    .map((entry) => entry.name)
+    .sort();
+  return [...ids.filter((id) => id === "core"), ...ids.filter((id) => id !== "core")];
+}
+
+function packIndex(): Plugin {
+  return {
+    name: "runenote-pack-index",
+    configureServer(server) {
+      // Read on every request, so a pack dropped in shows up on reload.
+      server.middlewares.use(INDEX, (_request, response) => {
+        response.setHeader("Content-Type", "application/json");
+        response.end(JSON.stringify(listPacks()));
+      });
+    },
+    generateBundle() {
+      this.emitFile({
+        type: "asset",
+        fileName: INDEX.slice(1),
+        source: JSON.stringify(listPacks()),
+      });
+    },
+  };
+}
+
 export default defineConfig({
+  plugins: [packIndex()],
   // The content tree is served as-is (/packs/core/ode-to-joy/song.json) and
   // copied into the build. It lives beside the app, not inside it, because
   // the pipeline writes it and the app only reads it.

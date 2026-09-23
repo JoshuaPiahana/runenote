@@ -3,7 +3,7 @@
 
 import "./style.css";
 import { Band, rolesCovered } from "./audio";
-import { loadBacking, loadPack, loadTier, type Song, type Tier } from "./bundle";
+import { type LoadedPack, loadBacking, loadPacks, loadTier, type Song, type Tier } from "./bundle";
 import { type Command, Gamepads, keyCommand } from "./gamepad";
 import { standInNote } from "./keys";
 import { connectMidi } from "./midi";
@@ -11,7 +11,6 @@ import { firstOnset, openingCue, type Piece, parseMusicXml, type TimedNote } fro
 import { midiToName } from "./notes";
 import { Score, type ScoreView } from "./score";
 
-const PACK_BASE = "/packs/core";
 const VIEWS = ["scrolling", "traditional"] as const;
 /** What makes a sound. The band alone is the default because a MIDI piano
     already sounds its own notes, and hearing each one twice a few
@@ -60,7 +59,9 @@ const pads = new Gamepads();
 const band = new Band();
 
 let screen: ScreenName = "songs";
-let songs: Song[] = [];
+let packs: LoadedPack[] = [];
+/** The URL of the pack the chosen song came from. */
+let packBase = "";
 let song: Song | undefined;
 let tier: Tier | undefined;
 let piece: Piece | undefined;
@@ -126,6 +127,13 @@ function fail(error: unknown): void {
 
 // --- cards ----------------------------------------------------------------
 
+function heading(text: string): HTMLElement {
+  const element = document.createElement("h2");
+  element.className = "shelf";
+  element.textContent = text;
+  return element;
+}
+
 function card(title: string, subtitle: string, onPick: () => void): HTMLElement {
   const element = document.createElement("button");
   element.className = "card";
@@ -147,13 +155,19 @@ function describeTier(t: Tier): string {
 }
 
 function showSongs(): void {
+  // A heading per pack once there is more than one, so a family pack reads
+  // as its own shelf rather than songs mixed in among core's.
   songGrid.replaceChildren(
-    ...songs.map((s) =>
-      card(s.title, s.composer ?? "", () => {
-        song = s;
-        showLevels(s);
-      }),
-    ),
+    ...packs.flatMap((p) => [
+      ...(packs.length > 1 ? [heading(p.pack.name)] : []),
+      ...p.songs.map((s) =>
+        card(s.title, s.composer ?? "", () => {
+          song = s;
+          packBase = p.base;
+          showLevels(s);
+        }),
+      ),
+    ]),
   );
   show("songs");
 }
@@ -206,7 +220,7 @@ async function draw(): Promise<void> {
   }
   playline.hidden = !score.isScrolling;
   try {
-    const xml = await loadTier(PACK_BASE, s, t);
+    const xml = await loadTier(packBase, s, t);
     piece = parseMusicXml(xml);
     opening = firstOnset(piece);
     // The traditional view is the printed copy, and print is black: colour is
@@ -245,16 +259,17 @@ async function startPlaying(s: Song, t: Tier): Promise<void> {
 
 /** The band for a song, fetched once and kept until another song is chosen. */
 async function loadBand(s: Song): Promise<void> {
-  if (s.id === bandFor) {
+  const which = `${packBase}/${s.id}`;
+  if (which === bandFor) {
     return;
   }
   try {
-    band.load(await loadBacking(PACK_BASE, s), s.backing?.tracks ?? []);
-    bandFor = s.id;
+    band.load(await loadBacking(packBase, s), s.backing?.tracks ?? []);
+    bandFor = which;
   } catch (error) {
     // A song with no band is quiet, not broken: the notation still plays.
     band.load([], []);
-    bandFor = s.id;
+    bandFor = which;
     fail(error);
   }
 }
@@ -453,8 +468,11 @@ void connectMidi({
 
 setView("scrolling");
 setSound(SOUNDS[0]);
-void loadPack(PACK_BASE).then(({ songs: loaded }) => {
-  songs = loaded;
+void loadPacks().then((loaded) => {
+  packs = loaded.packs;
+  if (loaded.problems.length > 0) {
+    fail(new Error(`Skipped a pack: ${loaded.problems.join("; ")}`));
+  }
   showSongs();
 }, fail);
 requestAnimationFrame(frame);

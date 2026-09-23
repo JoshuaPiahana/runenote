@@ -141,6 +141,38 @@ async function fetchJson(url: string): Promise<unknown> {
 export interface LoadedPack {
   pack: Pack;
   songs: Song[];
+  /** The pack's URL, which every file in it is fetched relative to. */
+  base: string;
+}
+
+export interface LoadedPacks {
+  packs: LoadedPack[];
+  /** One line per pack that would not load. */
+  problems: string[];
+}
+
+/** Loads every pack the server lists. A broken family pack is reported and
+    skipped rather than taking the others down with it: core must always
+    play, whatever has been dropped in beside it. */
+export async function loadPacks(root = "/packs"): Promise<LoadedPacks> {
+  const indexUrl = `${root}/index.json`;
+  const ids = await fetchJson(indexUrl);
+  if (!Array.isArray(ids) || !ids.every((id) => typeof id === "string")) {
+    throw new Error(`${indexUrl}: expected a list of pack ids`);
+  }
+  const settled = await Promise.allSettled(ids.map((id) => loadPack(`${root}/${id}`)));
+  const packs: LoadedPack[] = [];
+  const problems: string[] = [];
+  settled.forEach((result, i) => {
+    if (result.status === "fulfilled") {
+      packs.push(result.value);
+    } else {
+      problems.push(
+        `${ids[i]}: ${String(result.reason instanceof Error ? result.reason.message : result.reason)}`,
+      );
+    }
+  });
+  return { packs, problems };
 }
 
 /** Loads a pack and every song it lists. `packBase` is the pack's URL, no trailing slash. */
@@ -157,7 +189,7 @@ export async function loadPack(packBase: string): Promise<LoadedPack> {
       return song;
     }),
   );
-  return { pack, songs };
+  return { pack, songs, base: packBase };
 }
 
 export function loadTier(packBase: string, song: Song, tier: Tier): Promise<string> {
