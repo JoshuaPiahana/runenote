@@ -65,7 +65,7 @@ def write(
         "id": choices.song_id,
         "title": choices.title or source.title,
         "source": {
-            "kind": "musicxml",
+            "kind": source.kind,
             "licence": choices.licence,
             "file": source_file,
             "melody": choices.melody,
