@@ -1,0 +1,77 @@
+{
+  "id": "korobeiniki",
+  "title": "Korobeiniki",
+  "source": {
+    "kind": "musicxml",
+    "licence": "public-domain",
+    "file": "source.musicxml",
+    "melody": 1,
+    "origin": "Transcribed for Runenote from the Russian folk song Korobeiniki (19th century), its first strain as usually played; the piano accompaniment is our own."
+  },
+  "key": "A minor",
+  "time_signature": "4/4",
+  "tempo_bpm": 120.0,
+  "tiers": [
+    {
+      "level": 2,
+      "file": "tier-2.musicxml",
+      "hands": "right",
+      "layers": [
+        "melody"
+      ],
+      "difficulty": 47.2,
+      "range": {
+        "low": 69,
+        "high": 81
+      }
+    },
+    {
+      "level": 3,
+      "file": "tier-3.musicxml",
+      "hands": "both",
+      "layers": [
+        "bass",
+        "melody"
+      ],
+      "difficulty": 69.2,
+      "range": {
+        "low": 40,
+        "high": 81
+      }
+    },
+    {
+      "level": 4,
+      "file": "tier-4.musicxml",
+      "hands": "both",
+      "layers": [
+        "bass",
+        "harmony",
+        "melody"
+      ],
+      "difficulty": 80.8,
+      "range": {
+        "low": 40,
+        "high": 81
+      }
+    }
+  ],
+  "composer": "Music21",
+  "backing": {
+    "file": "backing.mid",
+    "style": "steady",
+    "tracks": [
+      {
+        "role": "bass",
+        "channel": 0
+      },
+      {
+        "role": "keys",
+        "channel": 1
+      },
+      {
+        "role": "drums",
+        "channel": 9
+      }
+    ]
+  }
+}

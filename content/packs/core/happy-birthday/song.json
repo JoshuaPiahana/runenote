@@ -1,0 +1,77 @@
+{
+  "id": "happy-birthday",
+  "title": "Happy Birthday",
+  "source": {
+    "kind": "musicxml",
+    "licence": "public-domain",
+    "file": "source.musicxml",
+    "melody": 1,
+    "origin": "Transcribed for Runenote from the melody of Good Morning to All (Mildred and Patty Hill, 1893); the piano accompaniment is our own."
+  },
+  "key": "C major",
+  "time_signature": "3/4",
+  "tempo_bpm": 96.0,
+  "tiers": [
+    {
+      "level": 2,
+      "file": "tier-2.musicxml",
+      "hands": "right",
+      "layers": [
+        "melody"
+      ],
+      "difficulty": 43.6,
+      "range": {
+        "low": 67,
+        "high": 79
+      }
+    },
+    {
+      "level": 3,
+      "file": "tier-3.musicxml",
+      "hands": "both",
+      "layers": [
+        "bass",
+        "melody"
+      ],
+      "difficulty": 65.6,
+      "range": {
+        "low": 41,
+        "high": 79
+      }
+    },
+    {
+      "level": 4,
+      "file": "tier-4.musicxml",
+      "hands": "both",
+      "layers": [
+        "bass",
+        "harmony",
+        "melody"
+      ],
+      "difficulty": 72.6,
+      "range": {
+        "low": 41,
+        "high": 79
+      }
+    }
+  ],
+  "composer": "Mildred J. Hill",
+  "backing": {
+    "file": "backing.mid",
+    "style": "waltz",
+    "tracks": [
+      {
+        "role": "bass",
+        "channel": 0
+      },
+      {
+        "role": "keys",
+        "channel": 1
+      },
+      {
+        "role": "drums",
+        "channel": 9
+      }
+    ]
+  }
+}
