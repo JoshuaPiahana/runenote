@@ -35,6 +35,8 @@ case "$cmd" in
   guard) py runenote guard --root /work ;;
   arrange) content arrange "$@" ;;
   regen)   content regenerate "$@" ;;
+  pack-export) content pack-export "$@" ;;
+  pack-import) content pack-import "$@" ;;
   test)  py pytest "$@"; js "npm test" ;;
   lint)  py ruff check .; py ruff format --check .; py mypy
          js "npm run lint && npm run typecheck" ;;
@@ -49,6 +51,8 @@ usage: ./rune <command>
   guard   check the repository only holds content it may hold
   arrange arrange a source into a song bundle (paths relative to the repo)
   regen   rebuild song bundles from their sources
+  pack-export <id>          write family pack <id> to <id>.pack.zip, to carry
+  pack-import <id>.pack.zip unpack a carried pack into content/packs
   test    pipeline and app tests
   lint    ruff, mypy, biome, tsc
   fmt     apply formatters and safe lint fixes

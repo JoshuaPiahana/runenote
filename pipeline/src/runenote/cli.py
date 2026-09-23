@@ -6,7 +6,7 @@ import argparse
 import sys
 from pathlib import Path
 
-from runenote import __version__, bundle, source, stems
+from runenote import __version__, bundle, packs, source, stems
 from runenote.arrange import ArrangeError, arrange
 from runenote.guard import check, find_repo_root
 from runenote.tiers import load_tiers
@@ -53,6 +53,13 @@ def main(argv: list[str] | None = None) -> int:
     regen.add_argument("bundle", type=Path, nargs="+", help="bundle directories")
     regen.add_argument("--root", type=Path, help="repository root, for the schema")
 
+    export = sub.add_parser("pack-export", help="write a family pack to one file, to carry")
+    export.add_argument("pack", help="pack id, a directory under content/packs")
+    export.add_argument("--root", type=Path, help="repository root (default: found from cwd)")
+    imp = sub.add_parser("pack-import", help="unpack a carried pack file into content/packs")
+    imp.add_argument("file", type=Path, help=f"a <id>{packs.SUFFIX} from pack-export")
+    imp.add_argument("--root", type=Path, help="repository root (default: found from cwd)")
+
     args = parser.parse_args(argv)
     try:
         if args.command == "guard":
@@ -61,7 +68,15 @@ def main(argv: list[str] | None = None) -> int:
             return _arrange(args)
         if args.command == "regenerate":
             return _regenerate(args)
-    except (source.SourceError, ArrangeError, bundle.BundleError, stems.StemError) as error:
+        if args.command in ("pack-export", "pack-import"):
+            return _carry(args)
+    except (
+        source.SourceError,
+        ArrangeError,
+        bundle.BundleError,
+        stems.StemError,
+        packs.PackError,
+    ) as error:
         print(f"error: {error}", file=sys.stderr)
         return 1
     return 2
@@ -76,6 +91,18 @@ def _guard(root: Path) -> int:
         f"{len(report.problems)} problems"
     )
     return 0 if report.ok else 1
+
+
+def _carry(args: argparse.Namespace) -> int:
+    root = args.root or find_repo_root(Path.cwd())
+    if args.command == "pack-export":
+        moved = packs.export_pack(root / "content" / "packs" / args.pack, root)
+        print(f"{moved.pack_id}: {moved.songs} songs -> {moved.path.relative_to(root)}")
+    else:
+        moved = packs.import_pack(args.file, root / "content" / "packs")
+        print(f"{moved.pack_id}: {moved.songs} songs -> {moved.path.relative_to(root)}")
+        print("reload the app to see them")
+    return 0
 
 
 def _arrange(args: argparse.Namespace) -> int:

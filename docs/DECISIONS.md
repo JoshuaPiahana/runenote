@@ -162,6 +162,16 @@ containers can both already see; a second mount for a folder elsewhere would
 be one more path for Git Bash to mangle. A pack that fails to load is shown as
 an error and skipped, and core still plays.
 
+A family pack reaches another machine as one file: `./rune pack-export <id>`
+writes `<id>.pack.zip` (the pack's manifest and the bundles it lists), and
+`./rune pack-import` unpacks it beside core on the other side. The piano
+laptop has a clone of this public repository and nothing else, so git cannot
+carry the pack there, and a file goes by whatever is at hand: a USB stick, a
+cloud drive, an email to yourself. An import replaces the earlier copy of that
+pack whole, so a song dropped at home is dropped on the laptop too, but it
+keeps the laptop's own `incoming/` working files, which the file never holds:
+every bundle carries its own source, so nothing needed to rebuild is lost.
+
 **Not doing.** Committing fan arrangements to any branch, ever, including
 private ones, because rules with exceptions eventually let the wrong file
 through.

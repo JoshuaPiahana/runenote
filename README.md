@@ -59,9 +59,22 @@ and writes a bundle: `song.json`, one MusicXML per level, a backing MIDI of
 the band it generated from the song's harmony (see
 `pipeline/src/runenote/styles.yaml`), and a copy of the source. Bundles are
 never edited by hand; `./rune regen content/packs/core/<id>` makes them again.
-
 The first song in `core` is Ode to Joy, transcribed as text in
 `pipeline/tests/fixtures/ode_to_joy.py`.
+
+## Moving a family pack to another machine
+
+Family packs are never committed, so a fresh clone has only core. Carry one
+across as a file:
+
+```
+./rune pack-export zelda-oot                  # here: writes zelda-oot.pack.zip
+./rune pack-import zelda-oot.pack.zip         # there, from the repo root
+```
+
+Put the file in the repository root on the other machine before importing;
+the pipeline container sees only the checkout. Re-import after any change.
+Reload the app and the pack's songs appear.
 
 ## Licence
 
