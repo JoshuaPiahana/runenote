@@ -126,15 +126,16 @@ export class Score {
   /**
    * Pixel x of a moment, in the drawn line's own coordinates. Space is time,
    * so this is one multiplication: no map to read, nothing to smooth. Before
-   * the start the line waits on its first beat; after the end it runs on to
-   * the edge, so the last note still crosses the play line.
+   * the start it keeps going, off the left of the drawing, so in the count-in
+   * the music slides in towards the line at the speed it will be played;
+   * after the end it runs on to the edge, so the last note still crosses.
    */
   positionAt(quarters: number): number {
     const drawn = this.drawn;
     if (!drawn) {
       return 0;
     }
-    const x = drawn.origin + Math.max(quarters, 0) * drawn.pxPerQuarter;
+    const x = drawn.origin + quarters * drawn.pxPerQuarter;
     return Math.min(x, drawn.width);
   }
 

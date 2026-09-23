@@ -4,6 +4,7 @@
 import "./style.css";
 import { Band, rolesCovered } from "./audio";
 import { type LoadedPack, loadBacking, loadPacks, loadTier, type Song, type Tier } from "./bundle";
+import { barQuarters, COUNT_IN_BARS, countInNotes, countInStart } from "./countin";
 import { type Command, Gamepads, keyCommand } from "./gamepad";
 import { saveRun, summarise } from "./history";
 import { intendedHand, Judge } from "./judge";
@@ -12,6 +13,7 @@ import { connectMidi } from "./midi";
 import { firstOnset, openingCue, type Piece, parseMusicXml, type TimedNote } from "./music";
 import { midiToName } from "./notes";
 import { Score, type ScoreView } from "./score";
+import type { BackingNote } from "./smf";
 
 const VIEWS = ["scrolling", "traditional"] as const;
 /** What makes a sound. The band alone is the default because a MIDI piano
@@ -85,6 +87,18 @@ const pressed = new Set<number>();
 let stageWidth = 0;
 /** Which song's band is loaded, so switching levels does not fetch it again. */
 let bandFor: string | undefined;
+/** That band's notes as written, before the count-in is put in front. */
+let bandNotes: BackingNote[] = [];
+
+/** One bar of this song, in quarter notes. */
+function barLength(): number {
+  return barQuarters(song?.time_signature ?? "4/4");
+}
+
+/** Where a run starts: two bars before the song, for the count-in. */
+function runStart(): number {
+  return piece ? countInStart(piece.bars, barLength()) : 0;
+}
 
 /** The playhead, in quarter notes from the start of the piece. */
 function playhead(): number {
@@ -197,8 +211,9 @@ function colour(name: string, fallback: string): string {
 function armGate(result?: string): void {
   // Every run begins on the player's own note, including after a loop: the
   // music never starts without them, so there is nothing to catch up with.
+  // That note starts the count-in, so the line waits two bars back.
   state = "waiting";
-  heldAt = opening[0]?.start ?? 0;
+  heldAt = runStart();
   judge = piece && song ? new Judge(piece, song.tempo_bpm) : undefined;
   score.clearFeedback();
   const cue = openingCue(opening);
@@ -232,6 +247,26 @@ function updateTransport(): void {
 }
 
 /** The opening note has been found, so the music moves. */
+/**
+ * During the count-in, the beat being counted, in the gate's place: the
+ * drums say it and this shows it, for a player who counts with their eyes.
+ * Once the song begins, the line gets the screen to itself.
+ */
+function showCount(now: number): void {
+  if (state !== "playing") {
+    return;
+  }
+  const start = runStart();
+  const length = barLength();
+  const counting = now < start + COUNT_IN_BARS * length;
+  if (counting) {
+    const unit = Number(song?.time_signature.split("/")[1]) || 4;
+    const beat = 4 / unit;
+    gate.textContent = String(Math.floor(((now - start) % length) / beat) + 1);
+  }
+  gate.hidden = !counting;
+}
+
 function release(): void {
   if (state === "waiting") {
     startedAt = performance.now();
@@ -284,6 +319,10 @@ async function startPlaying(s: Song, t: Tier): Promise<void> {
   band.standDown(rolesCovered(t.layers));
   show("play");
   await Promise.all([draw(), loadBand(s)]);
+  // The count-in is the band's own first bar, so it needs both the band and
+  // the bar lines of the piece before it can be put together.
+  const intro = piece ? countInNotes(bandNotes, piece.bars, barLength()) : [];
+  band.load([...intro, ...bandNotes], s.backing?.tracks ?? []);
 }
 
 /** The band for a song, fetched once and kept until another song is chosen. */
@@ -293,14 +332,13 @@ async function loadBand(s: Song): Promise<void> {
     return;
   }
   try {
-    band.load(await loadBacking(packBase, s), s.backing?.tracks ?? []);
-    bandFor = which;
+    bandNotes = await loadBacking(packBase, s);
   } catch (error) {
     // A song with no band is quiet, not broken: the notation still plays.
-    band.load([], []);
-    bandFor = which;
+    bandNotes = [];
     fail(error);
   }
+  bandFor = which;
 }
 
 function setView(next: ScoreView): void {
@@ -415,6 +453,7 @@ function frame(): void {
   if (screen === "play" && piece && score.isScrolling) {
     const now = playhead();
     score.follow(now);
+    showCount(now);
     // The sheet is moved rather than scrolled so the play line can stay put,
     // and the width comes from a variable rather than from the element so the
     // frame writes a style without also forcing a layout to read one back.
@@ -443,6 +482,10 @@ function played(note: number, velocity = 90): void {
     return;
   }
   const now = playhead();
+  if (now < judge.opensAt) {
+    // The count-in: nothing is written here yet, so nothing is judged.
+    return;
+  }
   const judgement = judge.play(note, now);
   if (judgement.kind === "hit") {
     score.hit(judgement.note);
