@@ -279,7 +279,7 @@ which key to press without showing what is written. Also not colouring notes by
 pitch: colour here means "this is your hand", which is structural and never has
 to be unlearned, rather than a code for note names that eventually must be.
 
-## A song starts when the player plays its first note.
+## A song starts when the player plays its start note, and the band counts them in.
 
 **Reason.** Borrowed from Duolingo Music, and kept because it earns its place:
 nothing moves until the opening note is played, so a run never begins with the
@@ -288,13 +288,24 @@ hands rather than a countdown's, and it means the very first thing that happens
 is a note read off the stave and found on the keyboard — the whole skill, in
 miniature, before the song has started.
 
+**Amended: the start note is a trigger, not the song's first note.** It used
+to start the music at the first note, so the tempo arrived just as it was
+needed and the player had to catch it on the fly. Now it starts two bars of
+the song's own band (its first whole bar, twice), with the beat counted on
+screen and the music sliding in towards the line at the speed it will be
+played. The melody comes in after. This is still not the metronome lead-in
+ruled out below: the player starts it, and it is the song's band, not a
+click. It lives in the app, not as a bar written into the bundle, because a
+bar 0 would renumber every bar and break the per-bar records. Keys pressed
+during the count-in are not judged.
+
 Any note of the opening counts, so a two-hand piece does not demand a four-note
 chord be struck together to begin; the prompt names one note, the top of the
 melody, because naming four reads as an instruction to play a chord. The gate
 is re-armed after every run, so looping the song never scrolls past a player
 who has stopped to think.
 
-**Not doing.** A countdown, a metronome lead-in, or an automatic start. Also not
+**Not doing.** Starting on a timer, a metronome click, or any start the player did not make. Also not
 requiring the full opening chord, which punishes the beginner the gate exists
 to help.
 

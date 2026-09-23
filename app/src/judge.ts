@@ -137,6 +137,13 @@ export class Judge {
     return missed;
   }
 
+  /** The earliest moment a press can count for anything. Before it, during
+      the count-in, keys are not judged: there is nothing to play yet. */
+  get opensAt(): number {
+    const first = this.targets[0];
+    return first ? first.note.start - WINDOW_MS / this.msPerQuarter : 0;
+  }
+
   /** Every note has been hit or missed. */
   get done(): boolean {
     return this.settled >= this.targets.length;
