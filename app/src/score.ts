@@ -5,7 +5,7 @@
 // spaces for reading, which is what a page is for.
 
 import { ColoringModes, type IOSMDOptions, OpenSheetMusicDisplay } from "opensheetmusicdisplay";
-import { type Layout, layout, readEngraving } from "./engrave";
+import { type Hand, type Layout, layout, readEngraving } from "./engrave";
 
 export type ScoreView = "scrolling" | "traditional";
 
@@ -28,6 +28,8 @@ const PAGE: IOSMDOptions = {
 /** Clefs and barlines, and the quieter stave lines under the notes. */
 const MUSIC_INK = "#7f8aa6";
 const LINE_INK = "#353c52";
+/** How long a wrong note stays on the line. Matches the fade in style.css. */
+const WRONG_FADE_MS = 1400;
 
 /**
  * Writes a colour onto every note, chosen by the part it belongs to, so the
@@ -131,6 +133,50 @@ export class Score {
     }
     const x = drawn.origin + Math.max(quarters, 0) * drawn.pxPerQuarter;
     return Math.min(x, drawn.width);
+  }
+
+  /**
+   * Lights a written note the player has found. Only the moving view shows
+   * feedback: the page is for reading, and marks on it would stay.
+   */
+  hit(note: { start: number; midi: number; hand: string }): void {
+    const index = this.drawn?.heads.findIndex(
+      (head) =>
+        Math.abs(head.note.start - note.start) < 1e-6 &&
+        head.note.midi === note.midi &&
+        head.note.hand === note.hand,
+    );
+    if (index === undefined || index === -1) {
+      return;
+    }
+    for (const element of this.line.querySelectorAll(`[data-i="${index}"]`)) {
+      element.classList.add("hit");
+    }
+  }
+
+  /** Rings a key pressed that was not wanted, where it was pressed. It fades
+      on its own, so a flurry of wrong notes does not pile up on the line. */
+  wrong(quarters: number, midi: number, hand: Hand | undefined, colour: string): void {
+    const svg = this.line.querySelector("svg");
+    if (!this.drawn || !svg) {
+      return;
+    }
+    svg.insertAdjacentHTML(
+      "beforeend",
+      `<g class="wrong">${this.drawn.wrongNote(quarters, midi, hand, colour)}</g>`,
+    );
+    const ring = svg.lastElementChild;
+    setTimeout(() => ring?.remove(), WRONG_FADE_MS);
+  }
+
+  /** Takes every mark off, for a fresh run over the same drawing. */
+  clearFeedback(): void {
+    for (const element of this.line.querySelectorAll(".hit")) {
+      element.classList.remove("hit");
+    }
+    for (const element of this.line.querySelectorAll(".wrong")) {
+      element.remove();
+    }
   }
 
   get isScrolling(): boolean {

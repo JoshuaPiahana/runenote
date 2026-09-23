@@ -56,8 +56,12 @@ export class Scheduler {
     this.at = Number.NaN;
   }
 
-  /** Call once a frame while the playhead is moving. */
-  follow(quarters: number, bpm: number): void {
+  /**
+   * Call once a frame while the playhead is moving. Nothing at or after
+   * `until` is handed over: in wait mode that is the note the player has not
+   * found yet, and the band comes in with them, not ahead of them.
+   */
+  follow(quarters: number, bpm: number, until = Number.POSITIVE_INFINITY): void {
     const secondsPerQuarter = 60 / Math.max(bpm, 1);
     // A playhead that went backwards, or forwards further than a beat in one
     // frame, is a restart or a seek rather than the music running on, so what
@@ -67,7 +71,7 @@ export class Scheduler {
     }
     this.at = quarters;
 
-    const horizon = quarters + this.lookahead / secondsPerQuarter;
+    const horizon = Math.min(quarters + this.lookahead / secondsPerQuarter, until);
     const from = Math.max(this.upTo, quarters);
     while (this.cursor < this.notes.length) {
       const note = this.notes[this.cursor];
@@ -166,8 +170,8 @@ export class Band {
     this.standingDown = new Set(roles);
   }
 
-  follow(quarters: number, bpm: number): void {
-    this.scheduler.follow(quarters, bpm);
+  follow(quarters: number, bpm: number, until?: number): void {
+    this.scheduler.follow(quarters, bpm, until);
   }
 
   /** The playhead has stopped, so the band stops with it. */

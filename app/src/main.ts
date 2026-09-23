@@ -4,7 +4,9 @@
 import "./style.css";
 import { Band, rolesCovered } from "./audio";
 import { type LoadedPack, loadBacking, loadPacks, loadTier, type Song, type Tier } from "./bundle";
+import { Follower, intendedHand } from "./follow";
 import { type Command, Gamepads, keyCommand } from "./gamepad";
+import { saveRun, summarise } from "./history";
 import { standInNote } from "./keys";
 import { connectMidi } from "./midi";
 import { firstOnset, openingCue, type Piece, parseMusicXml, type TimedNote } from "./music";
@@ -62,6 +64,7 @@ let screen: ScreenName = "songs";
 let packs: LoadedPack[] = [];
 /** The URL of the pack the chosen song came from. */
 let packBase = "";
+let packId = "";
 let song: Song | undefined;
 let tier: Tier | undefined;
 let piece: Piece | undefined;
@@ -70,6 +73,10 @@ let sound: (typeof SOUNDS)[number] = SOUNDS[0];
 /** Waiting for the opening note, running, or held. */
 let state: "waiting" | "playing" | "paused" = "waiting";
 let opening: TimedNote[] = [];
+/** Keeps the score of the run in progress, and says where the music must wait. */
+let follower: Follower | undefined;
+/** When the last frame ran, to measure how long the music stood waiting. */
+let lastFrame = 0;
 // The playhead is read from the clock, not accumulated a frame at a time: a
 // dropped frame must lose a frame of animation, never a fraction of a beat,
 // or the music quietly plays slower than the tempo it claims.
@@ -164,6 +171,7 @@ function showSongs(): void {
         card(s.title, s.composer ?? "", () => {
           song = s;
           packBase = p.base;
+          packId = p.pack.id;
           showLevels(s);
         }),
       ),
@@ -187,15 +195,38 @@ function colour(name: string, fallback: string): string {
   return value === "" ? fallback : value;
 }
 
-function armGate(): void {
+/** Sets up a fresh run. `result` is how the last one went, if it finished. */
+function armGate(result?: string): void {
   // Every run begins on the player's own note, including after a loop: the
   // music never starts without them, so there is nothing to catch up with.
   state = "waiting";
   heldAt = opening[0]?.start ?? 0;
+  follower = piece ? new Follower(piece) : undefined;
+  score.clearFeedback();
   const cue = openingCue(opening);
-  gate.textContent = cue ? `Play ${midiToName(cue.midi)} to start` : "";
+  const prompt = cue ? `Play ${midiToName(cue.midi)} to ${result ? "go again" : "start"}` : "";
+  gate.textContent = result ? `${result} ${prompt}` : prompt;
   gate.hidden = !cue || !score.isScrolling;
   updateTransport();
+}
+
+/** The last note has been played and has crossed the line: keep the record,
+    tell the player how it went, and wait for them to go again. */
+function finishRun(): void {
+  if (follower && song && tier) {
+    const bars = follower.bars;
+    saveRun({
+      pack: packId,
+      song: song.id,
+      level: tier.level,
+      finished: new Date().toISOString(),
+      mode: "wait",
+      bars,
+    });
+    armGate(summarise(bars));
+  } else {
+    armGate();
+  }
 }
 
 function updateTransport(): void {
@@ -363,21 +394,40 @@ function run(command: Command): void {
 
 function frame(): void {
   pads.poll(run);
+  const clock = performance.now();
+
+  // Wait mode: the playhead runs up to the next note nobody has played and
+  // stands there. It is re-anchored every frame it stands, so when the note
+  // comes the music carries on from that note rather than leaping ahead by
+  // however long the wait was.
+  if (screen === "play" && state === "playing" && follower) {
+    const limit = follower.waitingAt;
+    if (playhead() >= limit) {
+      // A frame gap longer than this is the tab asleep, not the player.
+      follower.waited(Math.min(clock - lastFrame, 250));
+      heldAt = limit;
+      startedAt = clock;
+    }
+  }
+  lastFrame = clock;
 
   // The band is driven from the playhead rather than started and left to run,
   // because the playhead stops: see audio.ts. Both views get it — the view is
   // how the music is drawn, not whether it is playing.
   if (screen === "play" && song && state === "playing" && sound.band) {
-    band.follow(playhead(), song.tempo_bpm);
+    band.follow(playhead(), song.tempo_bpm, follower?.waitingAt);
   } else {
     band.hold();
   }
 
+  if (screen === "play" && piece && state === "playing" && follower?.done) {
+    if (playhead() > piece.quarters + 2) {
+      finishRun();
+    }
+  }
+
   if (screen === "play" && piece && score.isScrolling) {
     const now = playhead();
-    if (state === "playing" && now > piece.quarters + 2) {
-      armGate();
-    }
     // The sheet is moved rather than scrolled so the play line can stay put,
     // and the width comes from a variable rather than from the element so the
     // frame writes a style without also forcing a layout to read one back.
@@ -388,7 +438,12 @@ function frame(): void {
 
 // --- input ----------------------------------------------------------------
 
-/** A note counts towards starting if it is one of the notes written there. */
+/**
+ * A note counts towards starting if it is one of the notes written there;
+ * once running, every note is judged against the one moment being waited on.
+ * Before the start and while paused nothing is judged: noodling about on the
+ * keys is not a wrong note.
+ */
 function played(note: number, velocity = 90): void {
   pressed.add(note);
   if (sound.you) {
@@ -396,6 +451,15 @@ function played(note: number, velocity = 90): void {
   }
   if (state === "waiting" && opening.some((wanted) => wanted.midi === note)) {
     release();
+  }
+  if (state !== "playing" || !follower) {
+    return;
+  }
+  const judgement = follower.play(note);
+  if (judgement.kind === "hit") {
+    score.hit(judgement.note);
+  } else if (judgement.kind === "wrong") {
+    score.wrong(playhead(), note, intendedHand(judgement.wanted), colour("--wrong", "#ff7a6b"));
   }
 }
 

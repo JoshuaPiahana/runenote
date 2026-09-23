@@ -112,3 +112,41 @@ describe("accidentals", () => {
     expect(marks(score(note("C", 4, 2, 1)))).toEqual(["sharp"]);
   });
 });
+
+describe("feedback", () => {
+  it("reads the key to press, accidentals and key included", () => {
+    const g = "<divisions>2</divisions><key><fifths>1</fifths></key>";
+    const pitches = readEngraving(
+      score(note("C", 4, 2) + note("F", 4, 2, 1) + note("B", 3, 2, -1), g),
+    );
+    expect(pitches.notes.map((n) => n.midi)).toEqual([60, 66, 58]);
+  });
+
+  it("tags each head and its hold-bar with the head's index, so one note can be lit", () => {
+    const drawn = layout(
+      readEngraving(score(note("C", 5, 2) + note("E", 5, 2, 0, "<chord/>") + note("G", 4, 2))),
+      INK,
+    );
+    const doc = new DOMParser().parseFromString(drawn.svg, "image/svg+xml");
+    drawn.heads.forEach((head, i) => {
+      const tagged = [...doc.querySelectorAll(`[data-i="${i}"]`)];
+      expect(tagged.map((el) => el.tagName).sort()).toEqual(["ellipse", "rect"]);
+      expect(Number(tagged.find((el) => el.tagName === "ellipse")?.getAttribute("cy"))).toBeCloseTo(
+        head.y,
+        0,
+      );
+    });
+  });
+
+  it("draws a wrong note on the line of the pitch played, so the distance shows", () => {
+    const drawn = layout(readEngraving(score(note("E", 4, 2))), INK);
+    // F4 is the first space: half a space above E4 on the bottom line.
+    expect(drawn.wrongNote(0, 65, "right", "red")).toContain(`cy="${BOTTOM_LINE - SPACE / 2}"`);
+    // Middle C gets its ledger line, in the wrong note's colour.
+    expect(drawn.wrongNote(0, 60, "right", "red")).toMatch(/<line[^>]*stroke="red"/);
+    // A black key is spelled as the key leans, and says so: C# in C major.
+    const sharp = drawn.wrongNote(0, 61, "right", "red");
+    expect(sharp).toContain(`cy="${BOTTOM_LINE + SPACE}"`);
+    expect(sharp).toContain("♯");
+  });
+});

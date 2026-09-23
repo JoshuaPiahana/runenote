@@ -32,6 +32,8 @@ export interface EngravedNote {
   start: number;
   /** Length in quarter notes, as written (ties are not joined here). */
   duration: number;
+  /** The key to press. */
+  midi: number;
   /** Diatonic steps from C0: the line or space the note sits on. */
   step: number;
   /** Accidental to print, if the key and the bar do not already imply it. */
@@ -56,6 +58,8 @@ export interface Engraving {
 }
 
 const STEP_INDEX: Record<string, number> = { C: 0, D: 1, E: 2, F: 3, G: 4, A: 5, B: 6 };
+/** Semitones above C of each diatonic step. */
+const SEMITONES = [0, 2, 4, 5, 7, 9, 11];
 const ACCIDENTAL_BY_ALTER: Record<number, EngravedNote["accidental"]> = {
   [-2]: "double-flat",
   [-1]: "flat",
@@ -211,6 +215,7 @@ export function readEngraving(xml: string): Engraving {
           hand,
           start,
           duration: beats,
+          midi: (octave + 1) * 12 + (SEMITONES[index] ?? 0) + alter,
           step,
           accidental,
           type: text(element, "type") ?? "quarter",
@@ -254,9 +259,19 @@ export interface Layout {
   /** Where quarter 0 is drawn. */
   origin: number;
   pxPerQuarter: number;
+  /** Every notehead drawn. Its index is the `data-i` on its head and hold-bar
+      in the SVG, which is how feedback finds a note to light up. */
   heads: { x: number; y: number; note: EngravedNote }[];
   barlines: number[];
   svg: string;
+  /**
+   * SVG for a note the player pressed that is not written: a ring where that
+   * pitch sits on the stave, at the moment given, with ledger lines if it
+   * needs them. Drawn where it was played so the player sees how far off it
+   * was ("one line too high"), not just that it was wrong. A hand says whose
+   * stave it belongs on; without one, middle C and up goes on the treble.
+   */
+  wrongNote(quarters: number, midi: number, hand: Hand | undefined, colour: string): string;
 }
 
 export interface Ink {
@@ -295,6 +310,25 @@ export function layout(engraving: Engraving, ink: Ink): Layout {
     const s = staves[staff];
     const top = tops[staff] ?? MARGIN;
     return top + SPACE * 4 - ((step - (s ? bottomLine(s.clef) : 30)) * SPACE) / 2;
+  };
+  /** Ledger lines from the stave out to a note beyond it. */
+  const ledgers = (staff: number, step: number, x: number, stroke: string): string[] => {
+    const s = staves[staff];
+    const bottom = s ? bottomLine(s.clef) : 30;
+    const out: string[] = [];
+    const line = (at: number) => {
+      const ly = yOf(staff, at);
+      out.push(
+        `<line x1="${f(x - HEAD_RX * 1.6)}" x2="${f(x + HEAD_RX * 1.6)}" y1="${f(ly)}" y2="${f(ly)}" stroke="${stroke}" stroke-width="1.4"/>`,
+      );
+    };
+    for (let at = bottom - 2; at >= step; at -= 2) {
+      line(at);
+    }
+    for (let at = bottom + 10; at <= step; at += 2) {
+      line(at);
+    }
+    return out;
   };
 
   const back: string[] = [];
@@ -426,13 +460,14 @@ export function layout(engraving: Engraving, ink: Ink): Layout {
     const up = first.stem ? first.stem === "up" : middle - low.step >= high.step - middle;
 
     // Duration bars behind the heads: the note held, drawn as its length.
-    for (const note of group) {
+    // Heads are pushed below in this same order, so the indexes agree.
+    group.forEach((note, k) => {
       const y = yOf(note.staff, note.step);
       const length = Math.max(note.duration * W - HEAD_RX * 0.8, HEAD_RX);
       back.push(
-        `<rect x="${f(x)}" y="${f(y - SPACE * 0.32)}" width="${f(length)}" height="${f(SPACE * 0.64)}" rx="${f(SPACE * 0.32)}" fill="${colour}" opacity="0.26"/>`,
+        `<rect data-i="${heads.length + k}" x="${f(x)}" y="${f(y - SPACE * 0.32)}" width="${f(length)}" height="${f(SPACE * 0.64)}" rx="${f(SPACE * 0.32)}" fill="${colour}" opacity="0.26"/>`,
       );
-    }
+    });
 
     // Seconds in a chord cannot share a column: the upper one of each pair
     // goes the other side of the stem.
@@ -449,23 +484,10 @@ export function layout(engraving: Engraving, ink: Ink): Layout {
       const y = yOf(note.staff, note.step);
       const hx = displaced.has(note) ? x + (up ? 1 : -1) * (HEAD_RX * 2 - 1.5) : x;
       heads.push({ x: hx, y, note });
-      // Ledger lines, from the stave out to the note.
-      const topStep = bottom + 8;
-      for (let s = bottom - 2; s >= note.step; s -= 2) {
-        const ly = yOf(note.staff, s);
-        mid.push(
-          `<line x1="${f(hx - HEAD_RX * 1.6)}" x2="${f(hx + HEAD_RX * 1.6)}" y1="${f(ly)}" y2="${f(ly)}" stroke="${ink.music}" stroke-width="1.4"/>`,
-        );
-      }
-      for (let s = topStep + 2; s <= note.step; s += 2) {
-        const ly = yOf(note.staff, s);
-        mid.push(
-          `<line x1="${f(hx - HEAD_RX * 1.6)}" x2="${f(hx + HEAD_RX * 1.6)}" y1="${f(ly)}" y2="${f(ly)}" stroke="${ink.music}" stroke-width="1.4"/>`,
-        );
-      }
+      mid.push(...ledgers(note.staff, note.step, hx, ink.music));
       const hollow = note.type === "half" || note.type === "whole" || note.type === "breve";
       front.push(
-        `<ellipse cx="${f(hx)}" cy="${f(y)}" rx="${f(HEAD_RX)}" ry="${f(HEAD_RY)}" transform="rotate(-20 ${f(hx)} ${f(y)})" ${
+        `<ellipse data-i="${heads.length - 1}" cx="${f(hx)}" cy="${f(y)}" rx="${f(HEAD_RX)}" ry="${f(HEAD_RY)}" transform="rotate(-20 ${f(hx)} ${f(y)})" ${
           hollow
             ? `fill="none" stroke="${colour}" stroke-width="${f(SPACE * 0.24)}"`
             : `fill="${colour}"`
@@ -563,5 +585,32 @@ export function layout(engraving: Engraving, ink: Ink): Layout {
   }
 
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${f(width)}" height="${f(height)}" viewBox="0 0 ${f(width)} ${f(height)}">${back.join("")}${mid.join("")}${front.join("")}</svg>`;
-  return { width, height, origin, pxPerQuarter: W, heads, barlines, svg };
+  const wrongNote: Layout["wrongNote"] = (quarters, midi, hand, colour) => {
+    const byHand = (h: Hand) => staves.findIndex((s) => s.hand === h);
+    const guess = byHand(midi >= 60 ? "right" : "left");
+    const own = hand === undefined ? -1 : byHand(hand);
+    const staff = own !== -1 ? own : guess !== -1 ? guess : 0;
+    // A black key is spelled the way the key signature leans: F# in a sharp
+    // key, Gb in a flat one. The ring sits on that line or space.
+    const pc = ((midi % 12) + 12) % 12;
+    const octave = Math.floor(midi / 12) - 1;
+    let index = SEMITONES.indexOf(pc);
+    let sign = "";
+    if (index === -1) {
+      index = fifths < 0 ? SEMITONES.indexOf(pc + 1) : SEMITONES.indexOf(pc - 1);
+      sign = fifths < 0 ? "♭" : "♯";
+    }
+    const step = octave * 7 + index;
+    const x = origin + quarters * W;
+    const y = yOf(staff, step);
+    return [
+      ...ledgers(staff, step, x, colour),
+      `<ellipse cx="${f(x)}" cy="${f(y)}" rx="${f(HEAD_RX)}" ry="${f(HEAD_RY)}" transform="rotate(-20 ${f(x)} ${f(y)})" fill="none" stroke="${colour}" stroke-width="${f(SPACE * 0.2)}"/>`,
+      sign
+        ? `<text x="${f(x - HEAD_RX - SPACE * 0.35)}" y="${f(y + SPACE * 0.55)}" text-anchor="end" font-size="${f(SPACE * 2)}" fill="${colour}">${sign}</text>`
+        : "",
+    ].join("");
+  };
+
+  return { width, height, origin, pxPerQuarter: W, heads, barlines, svg, wrongNote };
 }
