@@ -228,6 +228,17 @@ daily that bypasses reading competes with that for no gain the app needs. The
 scrolling stave keeps every hour of practice pointed at the skill the tutor is
 teaching, which is what maximising learning means here.
 
+In the moving line, **space is time**: one beat is always the same width, and
+the barline tucks in before the downbeat instead of taking room of its own.
+Printed music spaces for reading, and a line spaced that way cannot move at a
+constant speed: measured, a third of the note-to-note stretches changed speed
+by over a quarter, and the eye reads that as a stutter. So the moving line is
+drawn by us, not by the page engraver. It also makes rhythm visible — a half
+note is followed by twice the room of a quarter — and each note carries a
+faint bar the length it is held. That bar is help printed music does not
+give, so it is a candidate to fade as a player improves, as the correct-note
+cue will be.
+
 The **traditional** view — the printed page, wrapped systems, black on cream —
 stays one press away, because that is what the music looks like everywhere
 except in this app, and a player should never be surprised by it.
