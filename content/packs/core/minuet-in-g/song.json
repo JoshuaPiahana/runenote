@@ -1,0 +1,50 @@
+{
+  "id": "minuet-in-g",
+  "title": "Minuet in G",
+  "source": {
+    "kind": "musicxml",
+    "licence": "public-domain",
+    "file": "source.musicxml",
+    "melody": 1,
+    "origin": "Transcribed for Runenote from the Minuet in G major, BWV Anh. 114, in the 1725 Notebook for Anna Magdalena Bach; the right hand is the original melody, the piano accompaniment is our own."
+  },
+  "key": "G major",
+  "time_signature": "3/4",
+  "tempo_bpm": 112.0,
+  "tiers": [
+    {
+      "level": 4,
+      "file": "tier-4.musicxml",
+      "hands": "both",
+      "layers": [
+        "bass",
+        "harmony",
+        "melody"
+      ],
+      "difficulty": 84.6,
+      "range": {
+        "low": 43,
+        "high": 83
+      }
+    }
+  ],
+  "composer": "Christian Petzold",
+  "backing": {
+    "file": "backing.mid",
+    "style": "waltz",
+    "tracks": [
+      {
+        "role": "bass",
+        "channel": 0
+      },
+      {
+        "role": "keys",
+        "channel": 1
+      },
+      {
+        "role": "drums",
+        "channel": 9
+      }
+    ]
+  }
+}

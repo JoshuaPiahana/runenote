@@ -59,8 +59,10 @@ and writes a bundle: `song.json`, one MusicXML per level, a backing MIDI of
 the band it generated from the song's harmony (see
 `pipeline/src/runenote/styles.yaml`), and a copy of the source. Bundles are
 never edited by hand; `./rune regen content/packs/core/<id>` makes them again.
-The first song in `core` is Ode to Joy, transcribed as text in
-`pipeline/tests/fixtures/ode_to_joy.py`.
+Every song in `core` is public domain and transcribed as text, one module per
+song in `pipeline/tests/fixtures/` (Ode to Joy in `ode_to_joy.py`, the rest
+through `transcription.py`, which refuses a bar that does not add up). A test
+keeps each committed source equal to its module, so fix a wrong note there.
 
 ## Moving a family pack to another machine
 

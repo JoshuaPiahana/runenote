@@ -1,0 +1,77 @@
+{
+  "id": "amazing-grace",
+  "title": "Amazing Grace",
+  "source": {
+    "kind": "musicxml",
+    "licence": "public-domain",
+    "file": "source.musicxml",
+    "melody": 1,
+    "origin": "Transcribed for Runenote from the hymn tune New Britain (1829), sung to John Newton's Amazing Grace (1779); the piano accompaniment is our own."
+  },
+  "key": "G major",
+  "time_signature": "3/4",
+  "tempo_bpm": 84.0,
+  "tiers": [
+    {
+      "level": 2,
+      "file": "tier-2.musicxml",
+      "hands": "right",
+      "layers": [
+        "melody"
+      ],
+      "difficulty": 46.1,
+      "range": {
+        "low": 62,
+        "high": 74
+      }
+    },
+    {
+      "level": 3,
+      "file": "tier-3.musicxml",
+      "hands": "both",
+      "layers": [
+        "bass",
+        "melody"
+      ],
+      "difficulty": 63.0,
+      "range": {
+        "low": 43,
+        "high": 74
+      }
+    },
+    {
+      "level": 4,
+      "file": "tier-4.musicxml",
+      "hands": "both",
+      "layers": [
+        "bass",
+        "harmony",
+        "melody"
+      ],
+      "difficulty": 72.8,
+      "range": {
+        "low": 43,
+        "high": 74
+      }
+    }
+  ],
+  "composer": "Music21",
+  "backing": {
+    "file": "backing.mid",
+    "style": "waltz",
+    "tracks": [
+      {
+        "role": "bass",
+        "channel": 0
+      },
+      {
+        "role": "keys",
+        "channel": 1
+      },
+      {
+        "role": "drums",
+        "channel": 9
+      }
+    ]
+  }
+}

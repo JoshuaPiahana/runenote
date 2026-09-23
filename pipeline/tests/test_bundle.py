@@ -4,13 +4,22 @@ the pipeline writes validates, and it can write it again from what it wrote.
 
 from __future__ import annotations
 
+import dataclasses
 import json
 from pathlib import Path
 
 import pytest
 
 from conftest import REAL_ROOT, FakeRepo
-from fixtures import ode_to_joy
+from fixtures import (
+    amazing_grace,
+    happy_birthday,
+    korobeiniki,
+    minuet_in_g,
+    ode_to_joy,
+    transcription,
+    twinkle_twinkle,
+)
 from runenote.arrange import arrange
 from runenote.bundle import BundleError, Choices, musicxml_text, rebuild, write
 from runenote.guard import check
@@ -98,3 +107,33 @@ def test_the_core_ode_to_joy_source_is_the_transcription() -> None:
     note gets fixed there, once, and regenerated."""
     committed = (CORE / "ode-to-joy" / "source.musicxml").read_text(encoding="utf-8")
     assert committed == musicxml_text(ode_to_joy.score())
+
+
+# Every other core song is a transcription built by fixtures/transcription.py.
+TRANSCRIBED = {
+    "twinkle-twinkle": twinkle_twinkle.TUNE,
+    "happy-birthday": happy_birthday.TUNE,
+    "amazing-grace": amazing_grace.TUNE,
+    "korobeiniki": korobeiniki.TUNE,
+    "minuet-in-g": minuet_in_g.TUNE,
+}
+
+
+def test_every_core_song_has_a_transcription() -> None:
+    """A core source nobody can read as text is a source nobody can correct."""
+    assert set(core_songs()) == {"ode-to-joy", *TRANSCRIBED}
+
+
+@pytest.mark.parametrize("song_id", sorted(TRANSCRIBED))
+def test_a_core_source_is_its_transcription(song_id: str) -> None:
+    committed = (CORE / song_id / "source.musicxml").read_text(encoding="utf-8")
+    assert committed == musicxml_text(transcription.score(TRANSCRIBED[song_id]))
+
+
+def test_a_bar_that_does_not_add_up_is_refused() -> None:
+    """Only the first bar (a pickup) and the last may be short, so one wrong
+    duration cannot quietly shift every note after it."""
+    tune = twinkle_twinkle.TUNE
+    wrong = dataclasses.replace(tune, melody=tune.melody.replace("A4 A4 G4:h", "A4 G4:h", 1))
+    with pytest.raises(ValueError, match="bar 2"):
+        transcription.score(wrong)

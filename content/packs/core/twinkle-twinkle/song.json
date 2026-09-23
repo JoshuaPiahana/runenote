@@ -1,0 +1,90 @@
+{
+  "id": "twinkle-twinkle",
+  "title": "Twinkle Twinkle Little Star",
+  "source": {
+    "kind": "musicxml",
+    "licence": "public-domain",
+    "file": "source.musicxml",
+    "melody": 1,
+    "origin": "Transcribed for Runenote from the French folk tune Ah! vous dirai-je, maman (1761); the piano accompaniment is our own."
+  },
+  "key": "C major",
+  "time_signature": "4/4",
+  "tempo_bpm": 100.0,
+  "tiers": [
+    {
+      "level": 1,
+      "file": "tier-1.musicxml",
+      "hands": "right",
+      "layers": [
+        "melody"
+      ],
+      "difficulty": 30.5,
+      "range": {
+        "low": 60,
+        "high": 69
+      }
+    },
+    {
+      "level": 2,
+      "file": "tier-2.musicxml",
+      "hands": "right",
+      "layers": [
+        "melody"
+      ],
+      "difficulty": 30.5,
+      "range": {
+        "low": 60,
+        "high": 69
+      }
+    },
+    {
+      "level": 3,
+      "file": "tier-3.musicxml",
+      "hands": "both",
+      "layers": [
+        "bass",
+        "melody"
+      ],
+      "difficulty": 54.2,
+      "range": {
+        "low": 41,
+        "high": 69
+      }
+    },
+    {
+      "level": 4,
+      "file": "tier-4.musicxml",
+      "hands": "both",
+      "layers": [
+        "bass",
+        "harmony",
+        "melody"
+      ],
+      "difficulty": 69.0,
+      "range": {
+        "low": 41,
+        "high": 69
+      }
+    }
+  ],
+  "composer": "Music21",
+  "backing": {
+    "file": "backing.mid",
+    "style": "steady",
+    "tracks": [
+      {
+        "role": "bass",
+        "channel": 0
+      },
+      {
+        "role": "keys",
+        "channel": 1
+      },
+      {
+        "role": "drums",
+        "channel": 9
+      }
+    ]
+  }
+}
