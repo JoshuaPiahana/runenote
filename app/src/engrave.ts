@@ -243,6 +243,8 @@ export function readEngraving(xml: string): Engraving {
 export const SPACE = 16;
 const HEAD_RX = SPACE * 0.62;
 const HEAD_RY = SPACE * 0.45;
+/** Thickness of a hold-bar. */
+const HOLD_BAR = SPACE * 0.32;
 const STEM = SPACE * 3.4;
 /** Room above the top stave and below the bottom one for ledger lines. */
 const MARGIN = SPACE * 5;
@@ -516,12 +518,14 @@ export function layout(engraving: Engraving, ink: Ink, lead?: Lead): Layout {
     const up = first.stem ? first.stem === "up" : middle - low.step >= high.step - middle;
 
     // Duration bars behind the heads: the note held, drawn as its length.
+    // A third of a space thick, so it reads as a track out of the head
+    // rather than a second, stretched head filling the space it sits in.
     // Heads are pushed below in this same order, so the indexes agree.
     group.forEach((note, k) => {
       const y = yOf(note.staff, note.step);
       const length = Math.max(note.duration * W - HEAD_RX * 0.8, HEAD_RX);
       back.push(
-        `<rect data-i="${heads.length + k}" x="${f(x)}" y="${f(y - SPACE * 0.32)}" width="${f(length)}" height="${f(SPACE * 0.64)}" rx="${f(SPACE * 0.32)}" fill="${colour}" opacity="0.26"/>`,
+        `<rect data-i="${heads.length + k}" x="${f(x)}" y="${f(y - HOLD_BAR / 2)}" width="${f(length)}" height="${f(HOLD_BAR)}" rx="${f(HOLD_BAR / 2)}" fill="${colour}" opacity="0.26"/>`,
       );
     });
 
