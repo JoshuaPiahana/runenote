@@ -160,11 +160,30 @@ is for when the notes are known and fluency is the goal.
 scores well and feels like a game, but at fixed tempo a beginner's failure mode
 is to flail and wait for the song to end, which teaches nothing.
 
+**As built.** The line runs up to the next moment with an unplayed note and
+stands there. A chord wants every note, in any order. The right pitch counts
+whenever it comes, early included, because rushing is a rhythm fault and
+rhythm is tempo mode's to judge. A wrong note is drawn as a ring on the line
+or space of the key pressed, so the player sees how far off it was, not just
+that it was wrong. The band holds back its notes on the waiting beat and comes
+in with the player. Wait mode is also why output latency does not matter yet:
+nothing here is judged against a clock. It will matter for tempo mode, which
+needs the tap-along calibration first.
+
 ## Per-bar accuracy is recorded from the first version.
 
 **Reason.** Every later mode consumes it: contextual tips ("bar 12 again, left
 hand alone, half speed"), Survival's difficulty ramp, and Quests' revisit
 steps. Retrofitting it later means the early practice data is lost.
+
+**As built.** Each finished run appends one record per bar: notes written,
+notes found before any wrong note at that moment, wrong notes, total waiting,
+and the longest single wait. That last one is how wait mode reveals a note the
+player did not know, which a wrong-note count cannot see, since they could
+simply stop and look. The records are kept raw, and grading them is left to
+whoever reads them. They live in the browser's local storage, which is fine for
+one family on one machine but easy to lose. A run abandoned with restart is
+not recorded.
 
 **Not doing.** A global score only.
 
