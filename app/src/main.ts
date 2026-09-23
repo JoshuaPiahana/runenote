@@ -4,7 +4,7 @@
 import "./style.css";
 import { Band, rolesCovered } from "./audio";
 import { type LoadedPack, loadBacking, loadPacks, loadTier, type Song, type Tier } from "./bundle";
-import { barQuarters, COUNT_IN_BARS, countInNotes, countInStart } from "./countin";
+import { barQuarters, countInBarlines, countInNotes, countInStart } from "./countin";
 import { type Command, Gamepads, keyCommand } from "./gamepad";
 import { saveRun, summarise } from "./history";
 import { intendedHand, Judge } from "./judge";
@@ -211,15 +211,15 @@ function colour(name: string, fallback: string): string {
 function armGate(result?: string): void {
   // Every run begins on the player's own note, including after a loop: the
   // music never starts without them, so there is nothing to catch up with.
-  // That note starts the count-in, so the line waits two bars back.
+  // That note starts the count-in, so the line waits two bars back, on the
+  // small copy of it drawn there. Nothing names it: reading it off the stave
+  // is the lesson, and a name would be read instead.
   state = "waiting";
   heldAt = runStart();
   judge = piece && song ? new Judge(piece, song.tempo_bpm) : undefined;
   score.clearFeedback();
-  const cue = openingCue(opening);
-  const prompt = cue ? `Play ${midiToName(cue.midi)} to ${result ? "go again" : "start"}` : "";
-  gate.textContent = result ? `${result} ${prompt}` : prompt;
-  gate.hidden = !cue || !score.isScrolling;
+  gate.textContent = result ?? "";
+  gate.hidden = !result || !score.isScrolling;
   updateTransport();
 }
 
@@ -247,30 +247,11 @@ function updateTransport(): void {
 }
 
 /** The opening note has been found, so the music moves. */
-/**
- * During the count-in, the beat being counted, in the gate's place: the
- * drums say it and this shows it, for a player who counts with their eyes.
- * Once the song begins, the line gets the screen to itself.
- */
-function showCount(now: number): void {
-  if (state !== "playing") {
-    return;
-  }
-  const start = runStart();
-  const length = barLength();
-  const counting = now < start + COUNT_IN_BARS * length;
-  if (counting) {
-    const unit = Number(song?.time_signature.split("/")[1]) || 4;
-    const beat = 4 / unit;
-    gate.textContent = String(Math.floor(((now - start) % length) / beat) + 1);
-  }
-  gate.hidden = !counting;
-}
-
 function release(): void {
   if (state === "waiting") {
     startedAt = performance.now();
     state = "playing";
+    score.cueHit();
     gate.hidden = true;
     updateTransport();
   }
@@ -290,11 +271,17 @@ async function draw(): Promise<void> {
     // The traditional view is the printed copy, and print is black: colour is
     // what the moving view adds, not something the notation carries around.
     const ink = view === "traditional" ? "#1a1a1a" : undefined;
+    const cue = openingCue(opening);
     await score.show(
       xml,
       view,
       ink ?? colour("--right", "#3ee08a"),
       ink ?? colour("--left", "#6aa8ff"),
+      {
+        from: runStart(),
+        barlines: countInBarlines(piece.bars, barLength()),
+        cue: cue && { midi: cue.midi, hand: cue.hand },
+      },
     );
     playline.hidden = !score.isScrolling;
     if (!score.isScrolling) {
@@ -453,7 +440,6 @@ function frame(): void {
   if (screen === "play" && piece && score.isScrolling) {
     const now = playhead();
     score.follow(now);
-    showCount(now);
     // The sheet is moved rather than scrolled so the play line can stay put,
     // and the width comes from a variable rather than from the element so the
     // frame writes a style without also forcing a layout to read one back.

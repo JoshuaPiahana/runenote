@@ -3,7 +3,7 @@
 // never rings on into the song.
 
 import { describe, expect, it } from "vitest";
-import { barQuarters, countInNotes, countInStart } from "../src/countin";
+import { barQuarters, countInBarlines, countInNotes, countInStart } from "../src/countin";
 import type { BackingNote } from "../src/smf";
 
 function b(start: number, duration = 1, channel = 0): BackingNote {
@@ -26,6 +26,16 @@ describe("countInStart", () => {
     // One-beat pickup in 4/4: the first downbeat is at quarter 1, so the
     // count-in ends at -3 and the pickup fills the last beat of that bar.
     expect(countInStart([0, 1, 5], 4)).toBe(-11);
+  });
+});
+
+describe("countInBarlines", () => {
+  it("draws a barline between the count-in's bars and one where the song begins", () => {
+    expect(countInBarlines([0, 4, 8], 4)).toEqual([-4, 0]);
+  });
+
+  it("stays on the band's grid through a pickup, so the pickup is not barred off", () => {
+    expect(countInBarlines([0, 1, 5], 4)).toEqual([-7, -3]);
   });
 });
 

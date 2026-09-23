@@ -68,6 +68,44 @@ describe("space is time", () => {
   });
 });
 
+describe("the count-in drawn in front of the song", () => {
+  const engraving = readEngraving(readFileSync(TIER_4, "utf8"));
+  const plain = layout(engraving, INK);
+  const first = engraving.notes[0];
+  const lead = {
+    from: -8,
+    barlines: [-4, 0],
+    cue: first && { midi: first.midi, hand: first.hand },
+  };
+  const drawn = layout(engraving, INK, lead);
+
+  it("starts where the song would have, so the line has music under it from the first beat", () => {
+    expect(drawn.origin + lead.from * drawn.pxPerQuarter).toBeCloseTo(plain.origin);
+  });
+
+  it("keeps the song on the same grid, only further along", () => {
+    const shift = drawn.origin - plain.origin;
+    drawn.heads.forEach((head, i) => {
+      expect(head.x).toBeCloseTo((plain.heads[i]?.x ?? 0) + shift);
+    });
+  });
+
+  it("holds one note only, the opening note, small and at the count-in's start", () => {
+    const cues = drawn.svg.match(/<ellipse class="cue"[^>]*>/g) ?? [];
+    expect(cues).toHaveLength(1);
+    const cx = Number(/cx="([\d.]+)"/.exec(cues[0] ?? "")?.[1]);
+    expect(cx).toBeCloseTo(plain.origin, 0);
+    // Not a note of the song: nothing to judge, light or hold.
+    expect(drawn.heads).toHaveLength(plain.heads.length);
+  });
+
+  it("draws its barlines on the band's grid, unnumbered", () => {
+    expect(drawn.barlines.length).toBe(plain.barlines.length + lead.barlines.length);
+    const numbers = (svg: string) => (svg.match(/<text[^>]*system-ui[^>]*>\d+</g) ?? []).length;
+    expect(numbers(drawn.svg)).toBe(numbers(plain.svg));
+  });
+});
+
 describe("where notes sit", () => {
   const headsOf = (xml: string) => layout(readEngraving(xml), INK).heads;
 

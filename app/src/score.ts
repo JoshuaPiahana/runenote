@@ -5,7 +5,7 @@
 // spaces for reading, which is what a page is for.
 
 import { ColoringModes, type IOSMDOptions, OpenSheetMusicDisplay } from "opensheetmusicdisplay";
-import { type Hand, type Layout, layout, readEngraving } from "./engrave";
+import { type Hand, type Layout, type Lead, layout, readEngraving } from "./engrave";
 
 export type ScoreView = "scrolling" | "traditional";
 
@@ -94,7 +94,7 @@ export class Score {
     this.osmd = new OpenSheetMusicDisplay(this.page, PAGE);
   }
 
-  show(musicXml: string, view: ScoreView, right: string, left: string): Promise<void> {
+  show(musicXml: string, view: ScoreView, right: string, left: string, lead?: Lead): Promise<void> {
     const request = ++this.latest;
     const run = this.queue.then(async () => {
       if (request !== this.latest) {
@@ -105,12 +105,11 @@ export class Score {
       this.line.hidden = view !== "scrolling";
       this.page.hidden = view !== "traditional";
       if (view === "scrolling") {
-        this.drawn = layout(readEngraving(musicXml), {
-          right,
-          left,
-          music: MUSIC_INK,
-          lines: LINE_INK,
-        });
+        this.drawn = layout(
+          readEngraving(musicXml),
+          { right, left, music: MUSIC_INK, lines: LINE_INK },
+          lead,
+        );
         this.line.innerHTML = this.drawn.svg;
         return;
       }
@@ -125,10 +124,10 @@ export class Score {
 
   /**
    * Pixel x of a moment, in the drawn line's own coordinates. Space is time,
-   * so this is one multiplication: no map to read, nothing to smooth. Before
-   * the start it keeps going, off the left of the drawing, so in the count-in
-   * the music slides in towards the line at the speed it will be played;
-   * after the end it runs on to the edge, so the last note still crosses.
+   * so this is one multiplication: no map to read, nothing to smooth. The
+   * count-in is drawn in front of the song, so its negative quarters land on
+   * its own bars; after the end the line runs on to the edge, so the last
+   * note still crosses.
    */
   positionAt(quarters: number): number {
     const drawn = this.drawn;
@@ -166,6 +165,11 @@ export class Score {
         this.fills.push({ rect: element, start: note.start, full, midi: note.midi });
       }
     }
+  }
+
+  /** The opening note was played: light the count-in's cue for it. */
+  cueHit(): void {
+    this.line.querySelector(".cue")?.classList.add("hit");
   }
 
   /** Grows every held note's bar to where the play line has reached. */
