@@ -28,21 +28,31 @@ export interface Tier {
 }
 
 /** What the band plays. The player always has the melody, so there is no
-    melody role: the band is only ever the part that is missing. */
-export type Role = "bass" | "keys" | "drums";
+    melody role: the band is only ever the part that is missing. Drums and
+    colour (a source's echoes, counter-melodies, arpeggios) are never the
+    player's, so they always play. */
+export type Role = "bass" | "keys" | "drums" | "colour";
 
 export interface BackingTrack {
   role: Role;
   /** The MIDI channel this role was written on, so the app never has to
       guess a role from the order the tracks happen to be in. */
   channel: number;
+  /** General MIDI program, when the pipeline knows it (a source backing). */
+  program?: number;
+  /** The source part a source backing's track was copied from. */
+  part?: number;
 }
 
 export interface Backing {
   /** The band's MIDI, relative to the bundle. */
   file: string;
   /** The style row it was generated from. */
-  style: string;
+  /** Generated from the harmony ("band", the default), or the source's own
+      parts by role ("source"). */
+  from?: "band" | "source";
+  /** The style row a generated band came from; absent for a source backing. */
+  style?: string;
   tracks: BackingTrack[];
 }
 
@@ -56,6 +66,7 @@ export interface Song {
     origin?: string;
     file?: string;
     melody?: number;
+    roles?: Record<string, "bass" | "keys" | "drums" | "colour" | "drop">;
   };
   key?: string;
   time_signature: string;

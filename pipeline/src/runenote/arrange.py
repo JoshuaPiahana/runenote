@@ -9,12 +9,13 @@ which keys is the tier table's business (``tiers.yaml``), not this module's.
 from __future__ import annotations
 
 import copy
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
+from typing import Any
 
 from music21 import chord, interval, key, layout, metadata, note, pitch, stream, tempo
 
-from runenote import band
+from runenote import band, stems
 from runenote.source import Source
 from runenote.tiers import Tier
 
@@ -46,9 +47,10 @@ class Arrangement:
     semitones: int
     """How far the song moved from its written key; 0 when it stayed."""
     tiers: list[ArrangedTier]
-    backing: Backing | None
-    """The band, or None when the song has no harmony to build one from or no
-    style fits its time signature."""
+    backing: Backing | stems.StemBacking | None
+    """The band, generated or played from the source's own parts by role; or
+    None when the song has no harmony to build one from or no style fits its
+    time signature."""
 
 
 @dataclass(frozen=True)
@@ -63,9 +65,25 @@ def arrange(
     melody: int,
     tiers: Sequence[Tier],
     styles: Sequence[band.Style] | None = None,
+    roles: Mapping[int, str] | None = None,
 ) -> Arrangement:
+    """``roles``, when given, name what each non-melody part of a MIDI source
+    does (see stems.py): the backing is then those parts themselves, and the
+    left hand is read from the bass and keys parts only."""
     melody_part = source.part(melody)
-    accompaniment = [p for i, p in enumerate(source.score.parts, start=1) if i != melody]
+    if roles is not None:
+        if source.kind != "midi":
+            msg = f"{source.path}: roles need a MIDI source; the backing is copied from its tracks"
+            raise ArrangeError(msg)
+        try:
+            stems.check(stems.read(source.path), melody, roles)
+        except stems.StemError as error:
+            raise ArrangeError(f"{source.path}: {error}") from error
+    accompaniment = [
+        p
+        for i, p in enumerate(source.score.parts, start=1)
+        if i != melody and (roles is None or roles.get(i) in ("bass", "keys"))
+    ]
     midis = _midis(_skyline(melody_part))
     if not midis:
         msg = f"{source.path}: part {melody} has no notes to be the melody"
@@ -82,7 +100,24 @@ def arrange(
     melody_t = melody_part.transpose(shift)
     accompaniment_t = [p.transpose(shift) for p in accompaniment]
 
-    arranged = [_build(source, tier, melody_t, accompaniment_t, target) for tier in fitting]
+    if roles is not None:
+        bass_t = [p.transpose(shift) for i, p in _numbered(source) if roles.get(i) == "bass"]
+        keys_t = [p.transpose(shift) for i, p in _numbered(source) if roles.get(i) == "keys"]
+
+        def left(layers: frozenset[str]) -> stream.Part:
+            return _left_hand_from_roles(bass_t, keys_t, layers)
+
+        arranged = [_build(source, tier, melody_t, left, target) for tier in fitting]
+        try:
+            played = stems.build(source.path, melody, roles, semitones)
+        except stems.StemError as error:
+            raise ArrangeError(f"{source.path}: {error}") from error
+        return Arrangement(key=target, semitones=semitones, tiers=arranged, backing=played)
+
+    def chordified(layers: frozenset[str]) -> stream.Part:
+        return _left_hand(accompaniment_t, layers)
+
+    arranged = [_build(source, tier, melody_t, chordified, target) for tier in fitting]
 
     # The band is generated from the accompaniment's harmony rather than being
     # the accompaniment itself: see band.py, and DECISIONS, "The backing is a
@@ -140,7 +175,7 @@ def _build(
     source: Source,
     tier: Tier,
     melody: stream.Part,
-    accompaniment: Sequence[stream.Part],
+    left_hand: Callable[[frozenset[str]], stream.Part],
     target: key.Key,
 ) -> ArrangedTier:
     right = copy.deepcopy(melody) if "harmony" in tier.layers else _skyline(melody)
@@ -153,7 +188,7 @@ def _build(
 
     parts = [right]
     if tier.hands == "both":
-        parts.append(_left_hand(accompaniment, tier.layers))
+        parts.append(left_hand(tier.layers))
 
     score = stream.Score()
     score.metadata = metadata.Metadata(title=source.title)
@@ -187,6 +222,78 @@ def _left_hand(accompaniment: Sequence[stream.Part], layers: frozenset[str]) -> 
         _replace_chords(left, lambda c: min(c.pitches, key=lambda p: p.midi))
     left.partName = "Left hand"
     return left
+
+
+# The most notes a reduced left-hand chord holds: the bass and two above it,
+# all inside an octave, so one hand can always take it.
+LEFT_HAND_NOTES = 3
+
+
+def _left_hand_from_roles(
+    bass: Sequence[stream.Part],
+    keys: Sequence[stream.Part],
+    layers: frozenset[str],
+) -> stream.Part:
+    """One hand's worth of an orchestra's bass and harmony.
+
+    Chordifying an orchestration straight into the left hand gives chords no
+    hand can hold (Zelda's Lullaby: five notes, three and a half octaves
+    apart). So the hand follows the bass line's rhythm and, where the tier
+    asks for harmony, adds the chord the keys are sounding at that moment,
+    closed up inside the octave above the bass: the same voicing the band's
+    keys use. The pitches are the orchestra's; only the spacing is new.
+    """
+    left = _left_hand(bass or keys, frozenset())
+    if "harmony" in layers:
+        flats = [part.flatten() for part in [*bass, *keys]]
+        sounding = [(float(flat.elementOffset(n)), n) for flat in flats for n in flat.notes]
+        # A tied note keeps the chord it started with, or the tie would join
+        # two different chords.
+        voiced: list[pitch.Pitch] = []
+        for n in sorted(left.recurse().getElementsByClass(note.Note), key=_offset_in(left)):
+            container = n.activeSite
+            if n.tie is None or n.tie.type == "start" or not voiced:
+                at = _offset_in(left)(n)
+                heard = [
+                    p
+                    for start, s in sounding
+                    if start <= at < start + float(s.quarterLength)
+                    for p in s.pitches
+                ]
+                voiced = _close_above(n.pitch, heard)
+            if len(voiced) > 1 and container is not None:
+                held = chord.Chord([copy.deepcopy(p) for p in voiced])
+                held.duration = copy.deepcopy(n.duration)
+                held.tie = n.tie
+                container.replace(n, held)
+    left.partName = "Left hand"
+    return left
+
+
+def _offset_in(site: stream.Stream[Any]) -> Callable[[note.GeneralNote], float]:
+    return lambda n: float(n.getOffsetInHierarchy(site))
+
+
+def _close_above(root: pitch.Pitch, heard: Sequence[pitch.Pitch]) -> list[pitch.Pitch]:
+    """The bass, and the other pitch classes heard, each placed in the octave
+    above it and kept nearest first, spelled as the orchestra spelled them."""
+    placed: dict[int, pitch.Pitch] = {}
+    for p in heard:
+        step = (p.pitchClass - root.pitchClass) % 12
+        if step == 0 or step in placed:
+            continue
+        above = copy.deepcopy(p)
+        above.octave = root.octave
+        while above.midi <= root.midi:
+            above.octave = (above.octave or 4) + 1
+        while above.midi > root.midi + 12:
+            above.octave = (above.octave or 4) - 1
+        placed[step] = above
+    return [copy.deepcopy(root), *[placed[s] for s in sorted(placed)][: LEFT_HAND_NOTES - 1]]
+
+
+def _numbered(source: Source) -> list[tuple[int, stream.Part]]:
+    return list(enumerate(source.score.parts, start=1))
 
 
 def _skyline(part: stream.Part) -> stream.Part:

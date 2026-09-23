@@ -6,7 +6,7 @@ import argparse
 import sys
 from pathlib import Path
 
-from runenote import __version__, bundle, source
+from runenote import __version__, bundle, source, stems
 from runenote.arrange import ArrangeError, arrange
 from runenote.guard import check, find_repo_root
 from runenote.tiers import load_tiers
@@ -33,6 +33,21 @@ def main(argv: list[str] | None = None) -> int:
     arr.add_argument("--origin", help="where the source came from")
     arr.add_argument("--tempo", type=float, help="beats per minute, if the source has none")
     arr.add_argument("--root", type=Path, help="repository root, for the schema")
+    arr.add_argument(
+        "--backing",
+        choices=("band", "source"),
+        default="band",
+        help="band: generate one from the harmony (default). source: play the MIDI "
+        "source's own parts, each given a role with --role; omit --role to see suggestions",
+    )
+    arr.add_argument(
+        "--role",
+        action="append",
+        default=[],
+        metavar="N=ROLE",
+        help=f"role of part N in a source backing, one of {', '.join(stems.STEM_ROLES)}; "
+        "repeat for every part but the melody",
+    )
 
     regen = sub.add_parser("regenerate", help="rebuild bundles from their sources")
     regen.add_argument("bundle", type=Path, nargs="+", help="bundle directories")
@@ -46,7 +61,7 @@ def main(argv: list[str] | None = None) -> int:
             return _arrange(args)
         if args.command == "regenerate":
             return _regenerate(args)
-    except (source.SourceError, ArrangeError, bundle.BundleError) as error:
+    except (source.SourceError, ArrangeError, bundle.BundleError, stems.StemError) as error:
         print(f"error: {error}", file=sys.stderr)
         return 1
     return 2
@@ -67,6 +82,14 @@ def _arrange(args: argparse.Namespace) -> int:
     src = source.load(args.source, tempo_bpm=args.tempo)
     if args.melody is None:
         return _ask_for_melody(src)
+    roles: dict[int, str] | None = None
+    if args.backing == "source":
+        if not args.role:
+            return _ask_for_roles(src, args.melody)
+        roles = _parse_roles(args.role)
+    elif args.role:
+        print("error: --role only applies with --backing source", file=sys.stderr)
+        return 2
 
     choices = bundle.Choices(
         song_id=args.id or _slug(args.title or src.title),
@@ -76,8 +99,9 @@ def _arrange(args: argparse.Namespace) -> int:
         title=args.title,
         composer=args.composer,
         tempo_bpm=args.tempo,
+        roles=roles,
     )
-    arrangement = arrange(src, args.melody, load_tiers())
+    arrangement = arrange(src, args.melody, load_tiers(), roles=roles)
     root = args.root or find_repo_root(Path.cwd())
     song = bundle.write(arrangement, src, choices, args.out, schema_root=root)
 
@@ -85,11 +109,14 @@ def _arrange(args: argparse.Namespace) -> int:
         print(f"note: the source states no tempo; guessed {src.tempo_bpm:g} bpm (see --tempo)")
     moved = f"transposed {arrangement.semitones:+d}" if arrangement.semitones else "as written"
     print(f"{song['id']}: {song['key']} ({moved}), {len(song['tiers'])} tiers -> {args.out}")
-    if arrangement.backing is None:
+    if isinstance(arrangement.backing, stems.StemBacking):
+        parts = ", ".join(f"{t.part}:{t.role}" for t in arrangement.backing.tracks)
+        print(f"  backing: the source's own parts ({parts})")
+    elif arrangement.backing is None:
         print(f"  no band: nothing to take a harmony from, or no style fits {src.time_signature}")
     else:
-        roles = ", ".join(layer.role for layer in arrangement.backing.style.layers)
-        print(f"  band: {arrangement.backing.style.name} ({roles})")
+        played = ", ".join(layer.role for layer in arrangement.backing.style.layers)
+        print(f"  band: {arrangement.backing.style.name} ({played})")
     for tier in arrangement.tiers:
         folded = f", {tier.folded} folded" if tier.folded else ""
         print(
@@ -107,6 +134,35 @@ def _ask_for_melody(src: source.Source) -> int:
         mark = "  <- suggested" if part.index == suggested else ""
         print(f"  {part.index}. {part.name}: {part.notes} notes, {part.low}-{part.high}{mark}")
     return 2
+
+
+def _ask_for_roles(src: source.Source, melody: int) -> int:
+    found = stems.read(src.path)
+    suggested = stems.suggest(found, melody)
+    print(f"{src.path}: part {melody} is the melody. What does each other part do?")
+    print("  bass, keys: stand down when the player's own hands take them over")
+    print("  drums, colour: always play (colour: echoes, counter-melodies, arpeggios)")
+    print("  drop: left out of the backing")
+    for stem in found:
+        role = "melody" if stem.part == melody else suggested[stem.part]
+        print(
+            f"  {stem.part}. {stem.name}: GM {stem.program}, {stem.notes} notes, "
+            f"mean pitch {stem.mean_pitch:.0f} -> {role}"
+        )
+    flags = " ".join(f"--role {part}={role}" for part, role in sorted(suggested.items()))
+    print(f"Confirm or correct, then re-run with: --backing source {flags}")
+    return 2
+
+
+def _parse_roles(given: list[str]) -> dict[int, str]:
+    roles: dict[int, str] = {}
+    for item in given:
+        number, _, role = item.partition("=")
+        if not number.strip().isdigit() or not role:
+            msg = f"--role {item!r}: expected N=ROLE, e.g. 4=bass"
+            raise stems.StemError(msg)
+        roles[int(number)] = role.strip()
+    return roles
 
 
 def _regenerate(args: argparse.Namespace) -> int:

@@ -23,6 +23,7 @@ from music21.musicxml.m21ToXml import GeneralObjectExporter
 
 from runenote import source as sources
 from runenote.arrange import Arrangement, arrange
+from runenote.stems import StemBacking
 from runenote.tiers import Tier, load_tiers
 
 SONG_SCHEMA = "song.schema.json"
@@ -45,6 +46,9 @@ class Choices:
     title: str | None = None
     composer: str | None = None
     tempo_bpm: float | None = None
+    roles: dict[int, str] | None = None
+    """The role of every other part, when the backing is the source's own
+    parts rather than a generated band (see stems.py)."""
 
 
 def write(
@@ -92,7 +96,18 @@ def write(
         song["composer"] = composer
     if choices.origin:
         song["source"]["origin"] = choices.origin
-    if arrangement.backing is not None:
+    if choices.roles is not None:
+        song["source"]["roles"] = {str(part): role for part, role in sorted(choices.roles.items())}
+    if isinstance(arrangement.backing, StemBacking):
+        song["backing"] = {
+            "file": BACKING_FILE,
+            "from": "source",
+            "tracks": [
+                {"role": t.role, "channel": t.channel, "program": t.program, "part": t.part}
+                for t in arrangement.backing.tracks
+            ],
+        }
+    elif arrangement.backing is not None:
         style = arrangement.backing.style
         channels = style.channels
         song["backing"] = {
@@ -120,7 +135,9 @@ def write(
     for tier in arrangement.tiers:
         path = out / TIER_FILE.format(level=tier.tier.level)
         path.write_text(musicxml_text(tier.score), encoding="utf-8")
-    if arrangement.backing is not None:
+    if isinstance(arrangement.backing, StemBacking):
+        (out / BACKING_FILE).write_bytes(arrangement.backing.data)
+    elif arrangement.backing is not None:
         (out / BACKING_FILE).write_bytes(midi_bytes(arrangement.backing.score))
     (out / "song.json").write_text(json.dumps(song, indent=2) + "\n", encoding="utf-8")
     return song
@@ -148,19 +165,27 @@ def rebuild(
         title=song.get("title"),
         composer=song.get("composer"),
         tempo_bpm=song.get("tempo_bpm"),
+        roles={int(part): role for part, role in recorded["roles"].items()}
+        if "roles" in recorded
+        else None,
     )
     source = sources.load(bundle / recorded["file"], tempo_bpm=choices.tempo_bpm)
-    arrangement = arrange(source, choices.melody, tiers or load_tiers())
+    arrangement = arrange(source, choices.melody, tiers or load_tiers(), roles=choices.roles)
     return write(arrangement, source, choices, out or bundle, schema_root=schema_root)
 
 
 def musicxml_text(score: stream.Score) -> str:
     """MusicXML that is the same every time for the same score: no export
-    date, and part ids numbered in order rather than randomised."""
+    date, and part and instrument ids numbered in order rather than
+    randomised. (A MIDI source's parts carry instruments, and music21 gives
+    each a fresh random id on export.)"""
     text = GeneralObjectExporter().parse(score).decode("utf-8")
     text = re.sub(r"[ \t]*<encoding-date>[^<]*</encoding-date>\n", "", text)
     for number, old in enumerate(re.findall(r'<score-part id="([^"]+)"', text), start=1):
         text = text.replace(f'id="{old}"', f'id="P{number}"')
+    instruments = dict.fromkeys(re.findall(r'<score-instrument id="([^"]+)"', text))
+    for number, old in enumerate(instruments, start=1):
+        text = text.replace(f'id="{old}"', f'id="I{number}"')
     return text
 
 
