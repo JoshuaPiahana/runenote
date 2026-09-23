@@ -4,9 +4,9 @@
 import "./style.css";
 import { Band, rolesCovered } from "./audio";
 import { type LoadedPack, loadBacking, loadPacks, loadTier, type Song, type Tier } from "./bundle";
-import { Follower, intendedHand } from "./follow";
 import { type Command, Gamepads, keyCommand } from "./gamepad";
 import { saveRun, summarise } from "./history";
+import { intendedHand, Judge } from "./judge";
 import { standInNote } from "./keys";
 import { connectMidi } from "./midi";
 import { firstOnset, openingCue, type Piece, parseMusicXml, type TimedNote } from "./music";
@@ -73,10 +73,8 @@ let sound: (typeof SOUNDS)[number] = SOUNDS[0];
 /** Waiting for the opening note, running, or held. */
 let state: "waiting" | "playing" | "paused" = "waiting";
 let opening: TimedNote[] = [];
-/** Keeps the score of the run in progress, and says where the music must wait. */
-let follower: Follower | undefined;
-/** When the last frame ran, to measure how long the music stood waiting. */
-let lastFrame = 0;
+/** Keeps the score of the run in progress. */
+let judge: Judge | undefined;
 // The playhead is read from the clock, not accumulated a frame at a time: a
 // dropped frame must lose a frame of animation, never a fraction of a beat,
 // or the music quietly plays slower than the tempo it claims.
@@ -201,7 +199,7 @@ function armGate(result?: string): void {
   // music never starts without them, so there is nothing to catch up with.
   state = "waiting";
   heldAt = opening[0]?.start ?? 0;
-  follower = piece ? new Follower(piece) : undefined;
+  judge = piece && song ? new Judge(piece, song.tempo_bpm) : undefined;
   score.clearFeedback();
   const cue = openingCue(opening);
   const prompt = cue ? `Play ${midiToName(cue.midi)} to ${result ? "go again" : "start"}` : "";
@@ -213,14 +211,14 @@ function armGate(result?: string): void {
 /** The last note has been played and has crossed the line: keep the record,
     tell the player how it went, and wait for them to go again. */
 function finishRun(): void {
-  if (follower && song && tier) {
-    const bars = follower.bars;
+  if (judge && song && tier) {
+    const bars = judge.barRecords;
     saveRun({
       pack: packId,
       song: song.id,
       level: tier.level,
       finished: new Date().toISOString(),
-      mode: "wait",
+      mode: "tempo",
       bars,
     });
     armGate(summarise(bars));
@@ -394,40 +392,29 @@ function run(command: Command): void {
 
 function frame(): void {
   pads.poll(run);
-  const clock = performance.now();
-
-  // Wait mode: the playhead runs up to the next note nobody has played and
-  // stands there. It is re-anchored every frame it stands, so when the note
-  // comes the music carries on from that note rather than leaping ahead by
-  // however long the wait was.
-  if (screen === "play" && state === "playing" && follower) {
-    const limit = follower.waitingAt;
-    if (playhead() >= limit) {
-      // A frame gap longer than this is the tab asleep, not the player.
-      follower.waited(Math.min(clock - lastFrame, 250));
-      heldAt = limit;
-      startedAt = clock;
-    }
-  }
-  lastFrame = clock;
 
   // The band is driven from the playhead rather than started and left to run,
   // because the playhead stops: see audio.ts. Both views get it — the view is
   // how the music is drawn, not whether it is playing.
   if (screen === "play" && song && state === "playing" && sound.band) {
-    band.follow(playhead(), song.tempo_bpm, follower?.waitingAt);
+    band.follow(playhead(), song.tempo_bpm);
   } else {
     band.hold();
   }
 
-  if (screen === "play" && piece && state === "playing" && follower?.done) {
-    if (playhead() > piece.quarters + 2) {
+  // Notes the line has carried past unplayed are misses; once every note is
+  // settled and the last has crossed the line, the run is over.
+  if (screen === "play" && piece && state === "playing" && judge) {
+    const now = playhead();
+    judge.sweep(now);
+    if (judge.done && now > piece.quarters + 2) {
       finishRun();
     }
   }
 
   if (screen === "play" && piece && score.isScrolling) {
     const now = playhead();
+    score.follow(now);
     // The sheet is moved rather than scrolled so the play line can stay put,
     // and the width comes from a variable rather than from the element so the
     // frame writes a style without also forcing a layout to read one back.
@@ -440,9 +427,9 @@ function frame(): void {
 
 /**
  * A note counts towards starting if it is one of the notes written there;
- * once running, every note is judged against the one moment being waited on.
- * Before the start and while paused nothing is judged: noodling about on the
- * keys is not a wrong note.
+ * once running, every note is judged against what is written at the play
+ * line. Before the start and while paused nothing is judged: noodling about
+ * on the keys is not a wrong note.
  */
 function played(note: number, velocity = 90): void {
   pressed.add(note);
@@ -452,15 +439,21 @@ function played(note: number, velocity = 90): void {
   if (state === "waiting" && opening.some((wanted) => wanted.midi === note)) {
     release();
   }
-  if (state !== "playing" || !follower) {
+  if (state !== "playing" || !judge) {
     return;
   }
-  const judgement = follower.play(note);
+  const now = playhead();
+  const judgement = judge.play(note, now);
   if (judgement.kind === "hit") {
     score.hit(judgement.note);
-  } else if (judgement.kind === "wrong") {
-    score.wrong(playhead(), note, intendedHand(judgement.wanted), colour("--wrong", "#ff7a6b"));
+  } else {
+    score.wrong(now, note, intendedHand(judgement.near), colour("--wrong", "#ff7a6b"));
   }
+}
+
+function lifted(note: number): void {
+  pressed.delete(note);
+  score.release(note);
 }
 
 window.addEventListener("keydown", (event) => {
@@ -485,7 +478,7 @@ window.addEventListener("keyup", (event) => {
   if (tier) {
     const note = standInNote(event.key, tier.range.low);
     if (note !== undefined) {
-      pressed.delete(note);
+      lifted(note);
     }
   }
 });
@@ -523,7 +516,7 @@ void connectMidi({
   },
   onNoteOn: played,
   onNoteOff(note) {
-    pressed.delete(note);
+    lifted(note);
   },
   onUnavailable() {
     deviceLine.textContent = "No Web MIDI — type to play";
