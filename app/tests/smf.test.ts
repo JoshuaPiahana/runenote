@@ -140,6 +140,34 @@ describe("parseMidiFile", () => {
     expect(shape(parseMidiFile(file(track)))).toEqual([[0, 60, 1, 0]]);
   });
 
+  it("gives each note the instrument its channel was set to, whichever track set it", () => {
+    const setup = bytes(varint(0), [0xc0, 46], varint(0), [0xc1, 48]); // harp, strings
+    const harp = bytes(varint(0), [0x90, 60, 100], varint(DIVISION), [0x80, 60, 0]);
+    const strings = bytes(
+      varint(0),
+      [0x91, 64, 100],
+      varint(DIVISION),
+      [0x81, 64, 0],
+      varint(0),
+      [0xc1, 40], // a violin from here on
+      varint(0),
+      [0x91, 67, 100],
+      varint(DIVISION),
+      [0x81, 67, 0],
+    );
+    const unset = bytes(varint(0), [0x92, 72, 100], varint(DIVISION), [0x82, 72, 0]);
+    const programs = parseMidiFile(file(setup, harp, strings, unset)).map((n) => [
+      n.midi,
+      n.program,
+    ]);
+    expect(programs).toEqual([
+      [60, 46],
+      [64, 48],
+      [72, undefined],
+      [67, 40],
+    ]);
+  });
+
   it("holds a note the file never released open until the track ends", () => {
     const track = bytes(varint(0), [0x90, 60, 100], varint(DIVISION * 2), [0xb0, 7, 100]);
     expect(parseMidiFile(file(track))[0]?.duration).toBe(2);
