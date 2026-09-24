@@ -82,3 +82,9 @@ Reload the app and the pack's songs appear.
 
 Code is MIT. The `core` content pack is CC BY-SA 4.0 (see
 `content/packs/core/LICENSE`).
+
+The band's instruments are the FluidR3 GM SoundFont by Frank Wen, as rendered
+by Benjamin Gleitzman's
+[midi-js-soundfonts](https://github.com/gleitz/midi-js-soundfonts), used under
+[CC BY 3.0](https://creativecommons.org/licenses/by/3.0/). The app fetches
+them at play time; they are not part of this repository.

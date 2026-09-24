@@ -375,6 +375,26 @@ not in the code. The voices decay rather than sustain, which is also a
 learning choice: a pad held under a beginner covers their timing, and a
 plucked note does not.
 
+**Amended 2026-09-24: the pitched instruments are sampled.** A source
+backing names its instruments, a harp and two string sections, and three
+oscillators playing all seven parts made a full arrangement sound like a thin
+one. The objection above was to the recordings living in the repository, and
+they still do not: each instrument is fetched by the browser from the
+midi-js-soundfonts rendering of FluidR3 GM (CC BY 3.0, credited in the README)
+the first time a song needs it, and kept in the browser's cache. One is 2-3 MB,
+so only the programs a song names are fetched, never the 300 MB set. A note
+whose instrument has not arrived, or cannot, is synthesised as before, so no
+network means a plainer band, never a silent one. The drums stay synthesised:
+General MIDI's kit is not one of its programs, and this set has none. Which
+instrument a note plays is the program its channel was set to in
+`backing.mid`, so a generated band's bass and guitar sound as `styles.yaml`
+names them without the bundle having to say so.
+
+This gives up the learning choice above for sampled parts: a string section
+holds its note as long as the arrangement says. That is the arrangement's
+decision now, not the synth's, and if a held pad turns out to hide a
+player's timing the fix belongs in the arrangement.
+
 The app does not sound the player's own notes unless asked. A MIDI piano
 already makes its own sound, and hearing every note twice a few milliseconds
 apart is worse than the app being quiet; a keyboard with no speakers is the

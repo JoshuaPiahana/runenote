@@ -16,8 +16,10 @@
 // going to be heard. A generous one would keep the band playing for a moment
 // after the player paused, which is exactly the wrong moment.
 
+import { CacheStorage, Soundfont } from "smplr";
 import type { BackingTrack, Role } from "./bundle";
 import type { BackingNote } from "./smf";
+import { PIANO, sampleUrl } from "./voices";
 
 /** How far ahead of the playhead notes are handed to the audio clock. */
 const LOOKAHEAD_SECONDS = 0.12;
@@ -109,14 +111,54 @@ export function rolesCovered(layers: readonly string[]): Role[] {
 }
 
 // --- the voices -----------------------------------------------------------
-// Synthesised rather than sampled. A sampled band would sound better and
-// would be tens of megabytes of someone else's recordings, which is a licence
-// question this repository exists to avoid having. When a sampled kit earns
-// its place it belongs in a content pack, as an asset with a licence, not in
-// the code. The levels below were set by eye against the velocities the style
-// table writes, and want a pass by ear.
+// Each pitched note plays on the recorded instrument its program names
+// (voices.ts says where they come from). An instrument takes a moment to
+// arrive, and may not arrive at all without a network, so until it has, the
+// note is synthesised instead: a band that sounds plain beats one that falls
+// silent, which looks exactly like an app whose volume is down. The drums
+// are always synthesised.
+//
+// The synthesised levels were set by eye against the velocities the style
+// table writes; the sampled balance is a first guess. Both want a pass by ear.
 
 const LEVEL: Record<Role, number> = { bass: 0.5, keys: 0.22, drums: 0.3, colour: 0.2 };
+/** How loud each role's samples are, against the note's own velocity. The
+    player is not scaled at all: they are the lead. */
+const SAMPLE_BALANCE: Record<Role, number> = { bass: 0.9, keys: 0.7, drums: 1, colour: 0.75 };
+/** The recorded instruments together, against the synthesised drums. */
+const SAMPLE_LEVEL = 0.8;
+/** How long the player's own note rings on the piano before it is let go. */
+const PLUCK_SECONDS = 1.4;
+
+/** A recorded instrument, ready to play. */
+export interface Instrument {
+  /** Sound a note at a moment on the audio clock, for this many seconds. */
+  start(note: { note: number; velocity: number; time: number; duration: number }): void;
+  /** Stop everything it has been asked to play, including what has not begun. */
+  stop(): void;
+}
+
+/** Fetch the recorded instrument for a General MIDI program. */
+export type LoadInstrument = (
+  ctx: BaseAudioContext,
+  program: number,
+  into: AudioNode,
+) => Promise<Instrument>;
+
+let sampleCache: CacheStorage | undefined;
+
+/** The samples, kept by the browser after the first fetch so a song plays
+    the same whether or not the network is there the second time. */
+export const loadSample: LoadInstrument = async (ctx, program, into) => {
+  const instrumentUrl = sampleUrl(program);
+  if (!instrumentUrl) {
+    throw new Error(`${program} is not a General MIDI program`);
+  }
+  sampleCache ??= new CacheStorage("runenote-samples");
+  const instrument = Soundfont(ctx, { instrumentUrl, destination: into, storage: sampleCache });
+  await instrument.ready;
+  return instrument;
+};
 /** The player's own notes, for a keyboard that makes no sound of its own. */
 const PLAYER_LEVEL = 0.5;
 /** General MIDI percussion. Anything else the table grows gets the tick. */
@@ -134,10 +176,21 @@ export class Band {
   private noise?: AudioBuffer;
   private voices: Voice[] = [];
   private roles = new Map<number, Role>();
+  /** Each channel's program as the bundle names it, for a file that does not. */
+  private programs = new Map<number, number>();
   private standingDown = new Set<Role>();
   private readonly scheduler = new Scheduler((note, delay, length) =>
     this.sound(note, delay, length),
   );
+  private samples?: GainNode;
+  /** Programs the current song needs, fetched once the audio clock exists. */
+  private wanted = new Set<number>([PIANO]);
+  private fetching = new Map<number, Promise<void>>();
+  private instruments = new Map<number, Instrument>();
+  /** Instruments the band has played since it last fell silent. */
+  private sounding = new Set<Instrument>();
+
+  constructor(private readonly loadInstrument: LoadInstrument = loadSample) {}
 
   /**
    * Start or resume the audio clock. Browsers only allow this from a real
@@ -150,14 +203,30 @@ export class Band {
       this.ctx = new AudioContext();
       this.master = this.ctx.createGain();
       this.master.connect(this.ctx.destination);
+      this.samples = this.ctx.createGain();
+      this.samples.gain.value = SAMPLE_LEVEL;
+      this.samples.connect(this.master);
       this.noise = whiteNoise(this.ctx);
     }
     void this.ctx.resume();
+    this.fetchInstruments();
   }
 
   load(notes: BackingNote[], tracks: readonly BackingTrack[]): void {
     this.roles = new Map(tracks.map((track) => [track.channel, track.role]));
+    this.programs = new Map(
+      tracks.flatMap((track) =>
+        track.program === undefined ? [] : [[track.channel, track.program] as const],
+      ),
+    );
+    for (const note of notes) {
+      const program = this.programOf(note);
+      if (program !== undefined && this.roles.get(note.channel) !== "drums") {
+        this.wanted.add(program);
+      }
+    }
     this.scheduler.load(notes);
+    this.fetchInstruments();
   }
 
   /** The roles the player's own hands cover; the band leaves those to them. */
@@ -184,11 +253,16 @@ export class Band {
    * is what an undamped piano string does anyway.
    */
   pluck(midi: number, velocity = 90): void {
+    const piano = this.instruments.get(PIANO);
+    if (piano && this.ctx) {
+      piano.start({ note: midi, velocity, time: this.ctx.currentTime, duration: PLUCK_SECONDS });
+      return;
+    }
     this.tone(
       "keys",
       midi,
       (this.ctx?.currentTime ?? 0) + 0.001,
-      1.4,
+      PLUCK_SECONDS,
       (PLAYER_LEVEL * velocity) / 127,
     );
   }
@@ -203,8 +277,51 @@ export class Band {
     const level = (note.velocity / 127) * LEVEL[role];
     if (role === "drums") {
       this.hit(note.midi, at, level);
+      return;
+    }
+    const program = this.programOf(note);
+    const instrument = program === undefined ? undefined : this.instruments.get(program);
+    if (instrument) {
+      instrument.start({
+        note: note.midi,
+        velocity: Math.max(1, Math.round(note.velocity * SAMPLE_BALANCE[role])),
+        time: at,
+        duration: Math.max(length, 0.08),
+      });
+      this.sounding.add(instrument);
     } else {
       this.tone(role, note.midi, at, Math.max(length, 0.08), level);
+    }
+  }
+
+  /** The note's instrument: what the file set on its channel, or failing
+      that what the bundle says the channel is. */
+  private programOf(note: BackingNote): number | undefined {
+    return note.program ?? this.programs.get(note.channel);
+  }
+
+  /** Fetch whatever the song needs and has not been fetched. One that fails
+      is tried again when the next song loads; until then it is synthesised. */
+  private fetchInstruments(): void {
+    const ctx = this.ctx;
+    const samples = this.samples;
+    if (!ctx || !samples) {
+      return;
+    }
+    for (const program of this.wanted) {
+      if (this.fetching.has(program)) {
+        continue;
+      }
+      const fetched = this.loadInstrument(ctx, program, samples).then(
+        (instrument) => {
+          this.instruments.set(program, instrument);
+        },
+        (error: unknown) => {
+          console.warn(`[runenote] instrument ${program} not loaded, synthesising it`, error);
+          this.fetching.delete(program);
+        },
+      );
+      this.fetching.set(program, fetched);
     }
   }
 
@@ -307,6 +424,10 @@ export class Band {
       }
     }
     this.voices = [];
+    for (const instrument of this.sounding) {
+      instrument.stop();
+    }
+    this.sounding.clear();
   }
 }
 

@@ -20,6 +20,9 @@ export interface BackingNote {
   velocity: number;
   /** 0-15. Which role this is comes from the bundle, which names the channel. */
   channel: number;
+  /** The General MIDI program in force on the channel when the note began,
+      which is to say its instrument. Absent when the file never set one. */
+  program?: number;
 }
 
 const MTHD = 0x4d546864;
@@ -102,6 +105,9 @@ export function parseMidiFile(data: ArrayBuffer | Uint8Array): BackingNote[] {
   file.at = 8 + headerLength;
 
   const notes: BackingNote[] = [];
+  // A channel's program belongs to the file, not to the track that set it:
+  // some writers set every instrument from the first track.
+  const programs = new Map<number, number>();
   for (let track = 0; track < trackCount; track++) {
     if (file.at + 8 > bytes.byteLength) {
       break;
@@ -110,14 +116,20 @@ export function parseMidiFile(data: ArrayBuffer | Uint8Array): BackingNote[] {
       throw new Error(`malformed MIDI file: track ${track + 1} does not start with MTrk`);
     }
     const length = file.u32();
-    readTrack(new Reader(view, file.at), file.at + length, division, notes);
+    readTrack(new Reader(view, file.at), file.at + length, division, notes, programs);
     file.at += length;
   }
   notes.sort((a, b) => a.start - b.start || a.channel - b.channel || a.midi - b.midi);
   return notes;
 }
 
-function readTrack(track: Reader, end: number, division: number, into: BackingNote[]): void {
+function readTrack(
+  track: Reader,
+  end: number,
+  division: number,
+  into: BackingNote[],
+  programs: Map<number, number>,
+): void {
   let ticks = 0;
   let status = 0;
   /** Notes waiting to be released, by channel and pitch. */
@@ -156,9 +168,16 @@ function readTrack(track: Reader, end: number, division: number, into: BackingNo
       // Many writers send a note-off as a note-on of velocity zero.
       release(open, key, now, into);
       if (kind === NOTE_ON && velocity > 0) {
-        open.set(key, { midi, start: now, duration: 0, velocity, channel });
+        const program = programs.get(channel);
+        const held: BackingNote = { midi, start: now, duration: 0, velocity, channel };
+        if (program !== undefined) {
+          held.program = program;
+        }
+        open.set(key, held);
       }
-    } else if (kind === PROGRAM || kind === CHANNEL_PRESSURE) {
+    } else if (kind === PROGRAM) {
+      programs.set(channel, track.u8());
+    } else if (kind === CHANNEL_PRESSURE) {
       track.u8();
     } else {
       track.skip(2);

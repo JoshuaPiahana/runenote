@@ -7,7 +7,7 @@
 // volume is down.
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { Band } from "../src/audio";
+import { Band, type Instrument, type LoadInstrument } from "../src/audio";
 import type { BackingTrack } from "../src/bundle";
 import type { BackingNote } from "../src/smf";
 
@@ -98,12 +98,26 @@ beforeEach(() => {
   );
 });
 
-function playing(notes: BackingNote[], tracks = TRACKS): Band {
-  const band = new Band();
+/** An instrument that records what it was asked to play. */
+function recorder() {
+  const played: { note: number; velocity: number; time: number; duration: number }[] = [];
+  const instrument: Instrument = { start: (n) => played.push(n), stop: vi.fn() };
+  return { played, instrument };
+}
+
+/** No instrument ever arrives: every pitched note is synthesised, as it is
+    before the samples load or without a network. */
+const never: LoadInstrument = () => new Promise(() => undefined);
+
+function playing(notes: BackingNote[], tracks = TRACKS, load = never): Band {
+  const band = new Band(load);
   band.wake();
   band.load(notes, tracks);
   return band;
 }
+
+/** Let the instruments that are going to load, load. */
+const settled = () => new Promise((resolve) => setTimeout(resolve, 0));
 
 describe("Band", () => {
   it("sounds a pitched role as a tone at the note's own frequency", () => {
@@ -151,9 +165,77 @@ describe("Band", () => {
   });
 
   it("makes no sound at all before the audio clock has been started", () => {
-    const band = new Band();
+    const band = new Band(never);
     band.load([note(0, 48)], TRACKS);
     band.follow(0, 120);
     expect(context.oscillators).toHaveLength(0);
+  });
+});
+
+describe("Band, with recorded instruments", () => {
+  const harp = (midi: number, start = 0): BackingNote => ({ ...note(1, midi, start), program: 46 });
+
+  it("plays a note on its own instrument once that has loaded, at its moment", async () => {
+    context.currentTime = 10;
+    const { played, instrument } = recorder();
+    const load = vi.fn<LoadInstrument>(async () => instrument);
+    const band = playing([harp(60, 0.2)], TRACKS, load);
+    await settled();
+    band.follow(0, 120);
+    expect(load.mock.calls.map(([, program]) => program).sort()).toEqual([0, 46]);
+    expect(played).toHaveLength(1);
+    expect(played[0]?.note).toBe(60);
+    expect(played[0]?.time).toBeCloseTo(10.1);
+    expect(context.oscillators).toHaveLength(0);
+  });
+
+  it("synthesises a note whose instrument never arrived rather than dropping it", async () => {
+    const band = playing([harp(60)], TRACKS, async () => {
+      throw new Error("offline");
+    });
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    await settled();
+    band.follow(0, 120);
+    expect(context.oscillators).toHaveLength(1);
+  });
+
+  it("takes the instrument from the bundle when the file never named one", async () => {
+    const { played, instrument } = recorder();
+    const band = playing(
+      [note(0, 40)],
+      [{ role: "bass", channel: 0, program: 33 }],
+      async (_, p) => (p === 33 ? instrument : recorder().instrument),
+    );
+    await settled();
+    band.follow(0, 120);
+    expect(played.map((n) => n.note)).toEqual([40]);
+  });
+
+  it("keeps the drums synthesised, since no program is a drum kit", async () => {
+    const { played, instrument } = recorder();
+    const band = playing([{ ...note(9, 42), program: 0 }], TRACKS, async () => instrument);
+    await settled();
+    band.follow(0, 120);
+    expect(played).toHaveLength(0);
+    expect(context.buffers).toHaveLength(1);
+  });
+
+  it("stops what the instruments were asked to play when the playhead stops", async () => {
+    const { instrument } = recorder();
+    const band = playing([harp(60)], TRACKS, async () => instrument);
+    await settled();
+    band.follow(0, 120);
+    band.hold();
+    expect(instrument.stop).toHaveBeenCalled();
+  });
+
+  it("sounds the player's own notes on the piano, at full velocity", async () => {
+    const piano = recorder();
+    const band = playing([], TRACKS, async (_, p) =>
+      p === 0 ? piano.instrument : recorder().instrument,
+    );
+    await settled();
+    band.pluck(64, 100);
+    expect(piano.played.map((n) => [n.note, n.velocity])).toEqual([[64, 100]]);
   });
 });
